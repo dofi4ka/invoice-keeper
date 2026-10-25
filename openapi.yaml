@@ -1743,6 +1743,11 @@ components:
         email:
           type: string
           title: Email
+        telegram_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Telegram Id
         is_admin:
           type: boolean
           title: Is Admin
@@ -1755,6 +1760,7 @@ components:
       - name
       - role
       - email
+      - telegram_id
       - is_admin
       - ics_token
       title: MeOut
@@ -2044,6 +2050,13 @@ components:
           type: string
           format: email
           title: Email
+        telegram_id:
+          anyOf:
+          - type: integer
+            exclusiveMinimum: 0.0
+          - type: 'null'
+          title: Telegram Id
+          description: 'Числовой ID в Telegram: доступ к боту и личные напоминания'
         password:
           type: string
           maxLength: 200
@@ -2071,6 +2084,11 @@ components:
         email:
           type: string
           title: Email
+        telegram_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Telegram Id
         is_admin:
           type: boolean
           title: Is Admin
@@ -2080,6 +2098,7 @@ components:
       - name
       - role
       - email
+      - telegram_id
       - is_admin
       title: UserOut
     UserUpdate:
@@ -2103,6 +2122,13 @@ components:
             format: email
           - type: 'null'
           title: Email
+        telegram_id:
+          anyOf:
+          - type: integer
+            exclusiveMinimum: 0.0
+          - type: 'null'
+          title: Telegram Id
+          description: null — отвязать Telegram
         password:
           anyOf:
           - type: string

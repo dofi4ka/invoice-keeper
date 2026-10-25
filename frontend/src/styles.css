@@ -686,7 +686,7 @@ textarea.input {
 .cards {
   display: grid;
   gap: 10px;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(270px, 100%), 1fr));
 }
 
 .cards.two {
@@ -774,10 +774,15 @@ textarea.input {
 
 .inv-meta {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
-  gap: 8px;
+  gap: 0 8px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.inv-meta > span {
+  white-space: nowrap;
 }
 
 .inv-hint.paid {

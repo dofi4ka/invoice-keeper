@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     telegram_bot_token: str = ""
     telegram_chat_id: str = ""
+    telegram_admin_id: str = ""
 
     smtp_host: str = ""
     smtp_port: int = 587
@@ -37,6 +38,16 @@ class Settings(BaseSettings):
     @cached_property
     def tz(self) -> ZoneInfo:
         return ZoneInfo(self.timezone)
+
+    @property
+    def admin_telegram_id(self) -> int | None:
+        value = self.telegram_admin_id.strip()
+        return int(value) if value else None
+
+    @property
+    def telegram_target(self) -> str:
+        """The chat that receives reminders; falls back to the administrator's direct messages."""
+        return self.telegram_chat_id.strip() or self.telegram_admin_id.strip()
 
     @property
     def public_base(self) -> str:

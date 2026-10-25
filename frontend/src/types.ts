@@ -10,6 +10,7 @@ export interface User {
   name: string;
   role: string | null;
   email: string;
+  telegram_id: number | null;
   is_admin: boolean;
 }
 

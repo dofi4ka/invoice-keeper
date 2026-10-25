@@ -8,6 +8,7 @@ function UserForm({ user, onDone }: { user: User | null; onDone: (id: number | n
   const [name, setName] = useState(user?.name ?? "");
   const [role, setRole] = useState(user?.role ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
+  const [telegramId, setTelegramId] = useState(user?.telegram_id?.toString() ?? "");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,8 +17,15 @@ function UserForm({ user, onDone }: { user: User | null; onDone: (id: number | n
     setError(null);
     if (!name.trim() || !email.trim()) return setError("Укажите имя и почту");
     if (!user && password.length < 6) return setError("Пароль должен быть не короче 6 символов");
+    const tg = telegramId.trim();
+    if (tg && !/^\d+$/.test(tg)) return setError("Telegram ID — это число, например 123456789");
     try {
-      const body: Record<string, unknown> = { name: name.trim(), role: role.trim() || null, email: email.trim() };
+      const body: Record<string, unknown> = {
+        name: name.trim(),
+        role: role.trim() || null,
+        email: email.trim(),
+        telegram_id: tg ? Number(tg) : null,
+      };
       if (password) body.password = password;
       const saved = user
         ? await api<User>(`/users/${user.id}`, { method: "PATCH", json: body })
@@ -48,6 +56,15 @@ function UserForm({ user, onDone }: { user: User | null; onDone: (id: number | n
       </Kv>
       <Kv label="Почта">
         <input className="input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+      </Kv>
+      <Kv label="Telegram ID" tip="Числовой ID (узнать можно у @userinfobot). Без него бот не отвечает сотруднику и не присылает ему напоминания в личку">
+        <input
+          className="input"
+          inputMode="numeric"
+          value={telegramId}
+          placeholder="Необязательно"
+          onChange={(e) => setTelegramId(e.target.value)}
+        />
       </Kv>
       <Kv label={user ? "Новый пароль" : "Пароль"} tip={user ? "Оставьте пустым, чтобы не менять пароль" : undefined}>
         <div className="input-group" style={{ width: "100%" }}>
@@ -94,7 +111,7 @@ export default function Users() {
   const [selected, setSelected] = useState<number | "new" | null>(null);
   const q = query.trim().toLowerCase();
   const rows = (data ?? []).filter(
-    (u) => !q || [u.name, u.email, u.role ?? ""].some((v) => v.toLowerCase().includes(q)),
+    (u) => !q || [u.name, u.email, u.role ?? "", u.telegram_id?.toString() ?? ""].some((v) => v.toLowerCase().includes(q)),
   );
   const current = typeof selected === "number" ? data?.find((u) => u.id === selected) ?? null : null;
 
@@ -116,6 +133,7 @@ export default function Users() {
                   <th>Имя</th>
                   <th>Роль</th>
                   <th className="hide-sm">Почта</th>
+                  <th className="hide-sm">Telegram ID</th>
                 </tr>
               </thead>
               <tbody>
@@ -129,6 +147,7 @@ export default function Users() {
                     <td>{u.name}</td>
                     <td>{u.is_admin ? <span className="pill">Админ</span> : u.role || <span className="muted">—</span>}</td>
                     <td className="hide-sm">{u.email}</td>
+                    <td className="hide-sm">{u.telegram_id ?? <span className="muted">—</span>}</td>
                   </tr>
                 ))}
               </tbody>

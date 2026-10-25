@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 
@@ -23,3 +24,8 @@ async def create_schema() -> None:
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        # Columns added after the first release: create_all does not alter existing tables.
+        await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS telegram_id BIGINT"))
+        await conn.execute(
+            text("CREATE UNIQUE INDEX IF NOT EXISTS users_telegram_id_key ON users (telegram_id)")
+        )

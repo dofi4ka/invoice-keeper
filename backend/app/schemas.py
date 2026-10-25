@@ -27,6 +27,7 @@ class UserOut(ORM):
     name: str
     role: str | None
     email: str
+    telegram_id: int | None
     is_admin: bool
 
 
@@ -43,6 +44,7 @@ class UserCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     role: str | None = Field(default=None, max_length=200)
     email: EmailStr
+    telegram_id: int | None = Field(default=None, gt=0, description="Числовой ID в Telegram: доступ к боту и личные напоминания")
     password: str = Field(min_length=6, max_length=200)
 
 
@@ -50,6 +52,7 @@ class UserUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     role: str | None = Field(default=None, max_length=200)
     email: EmailStr | None = None
+    telegram_id: int | None = Field(default=None, gt=0, description="null — отвязать Telegram")
     password: str | None = Field(default=None, description="Пустая строка или null — пароль не меняется")
 
     @field_validator("password")

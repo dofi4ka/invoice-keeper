@@ -28,6 +28,16 @@ async def ensure_email_free(db: DB, email: str, exclude_id: int | None = None) -
         raise HTTPException(409, "Пользователь с такой почтой уже существует")
 
 
+async def ensure_telegram_free(db: DB, telegram_id: int | None, exclude_id: int | None = None) -> None:
+    if telegram_id is None:
+        return
+    stmt = select(User.id).where(User.telegram_id == telegram_id)
+    if exclude_id:
+        stmt = stmt.where(User.id != exclude_id)
+    if await db.scalar(stmt):
+        raise HTTPException(409, "Пользователь с таким Telegram ID уже существует")
+
+
 @router.get("", response_model=list[schemas.UserOut], summary="Получение списка пользователей")
 async def list_users(db: DB, user: CurrentUser):
     """Все пользователи (включая администратора) — нужен, чтобы назначать ответственных."""
@@ -38,10 +48,12 @@ async def list_users(db: DB, user: CurrentUser):
 async def create_user(body: schemas.UserCreate, request: Request, db: DB, admin: AdminUser):
     email = body.email.lower()
     await ensure_email_free(db, email)
+    await ensure_telegram_free(db, body.telegram_id)
     user = User(
         name=body.name.strip(),
         role=(body.role or "").strip() or None,
         email=email,
+        telegram_id=body.telegram_id,
         password_hash=hash_password(body.password),
         is_admin=False,
         ics_token=secrets.token_urlsafe(32),
@@ -68,6 +80,10 @@ async def update_user(user_id: int, body: schemas.UserUpdate, request: Request, 
         await ensure_email_free(db, body.email, user.id)
         user.email = body.email.lower()
         changes.append("почта")
+    if "telegram_id" in fields and body.telegram_id != user.telegram_id:
+        await ensure_telegram_free(db, body.telegram_id, user.id)
+        user.telegram_id = body.telegram_id
+        changes.append("Telegram ID")
     if body.password:
         user.password_hash = hash_password(body.password)
         changes.append("пароль")

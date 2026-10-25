@@ -5,10 +5,13 @@ import logging
 from collections.abc import Coroutine
 from typing import Any
 
+from datetime import timedelta
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from . import periods
+from .config import settings
 from .models import Invoice, Notification, Occurrence, User
 from .texts import d, due_hint, invoice_url, money, status_of
 
@@ -120,6 +123,36 @@ async def emit(
         recipients = [u.email for u in invoice.responsibles]
         if recipients:
             spawn(email.send_event(event, data, recipients))
+
+
+async def remind_new_responsibles(db: AsyncSession, invoice: Invoice, users: list[User], actor: User) -> None:
+    """People added to a payment get, right away, the Telegram DM and e-mail they would have
+    missed: for overdue periods and for those whose reminder already went out. Periods still
+    waiting for their reminder are left to the scheduler, which includes the new people."""
+    users = [u for u in users if u.id != actor.id]
+    if not users or invoice.archived_at is not None:
+        return
+    today = periods.today()
+    stmt = (
+        select(Occurrence)
+        .where(
+            Occurrence.invoice_id == invoice.id,
+            Occurrence.is_paid.is_(False),
+            Occurrence.due_date <= today + timedelta(days=settings.reminder_days),
+        )
+        .order_by(Occurrence.due_date)
+    )
+    from .notify import bot, email
+
+    for occ in await db.scalars(stmt):
+        overdue = occ.due_date < today
+        if not overdue and occ.reminder_sent_at is None:
+            continue
+        event = "occurrence.overdue" if overdue else "occurrence.reminder"
+        data = payload(event, invoice, occ, actor)
+        spawn(email.send_event(event, data, [u.email for u in users]))
+        for user in users:
+            spawn(bot.send_assigned(occ, user))
 
 
 def notify_assigned(db: AsyncSession, invoice: Invoice, user_ids: set[int], actor: User) -> None:

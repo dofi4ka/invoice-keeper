@@ -25,6 +25,13 @@ async def sync_admin(db: AsyncSession) -> None:
         log.warning("Regular user %s had the administrator e-mail and was removed", email)
         await db.delete(clash)
         await db.flush()
+    tg_id = settings.admin_telegram_id
+    if tg_id is not None:
+        taken = await db.scalar(select(User).where(User.telegram_id == tg_id, User.is_admin.is_(False)))
+        if taken is not None:
+            log.warning("Regular user %s had the administrator Telegram ID, it was cleared", taken.email)
+            taken.telegram_id = None
+            await db.flush()
     if admin is None:
         admin = User(
             name=settings.admin_name,
@@ -40,6 +47,7 @@ async def sync_admin(db: AsyncSession) -> None:
         if not verify_password(settings.admin_password, admin.password_hash):
             admin.password_hash = hash_password(settings.admin_password)
     admin.role = None
+    admin.telegram_id = tg_id
     await db.commit()
 
 

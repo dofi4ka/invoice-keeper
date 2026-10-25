@@ -121,7 +121,9 @@ async def update_invoice(invoice_id: int, body: schemas.InvoiceUpdate, request: 
     if "responsible_ids" in fields and body.responsible_ids is not None:
         before = {u.id for u in invoice.responsibles}
         invoice.responsibles = await load_responsibles(db, body.responsible_ids)
-        events.notify_assigned(db, invoice, {u.id for u in invoice.responsibles} - before, admin)
+        added = [u for u in invoice.responsibles if u.id not in before]
+        events.notify_assigned(db, invoice, {u.id for u in added}, admin)
+        await events.remind_new_responsibles(db, invoice, added, admin)
         changes.append("ответственные")
     if changes:
         audit.log(

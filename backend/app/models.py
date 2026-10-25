@@ -4,6 +4,7 @@ from typing import Any
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -33,6 +34,7 @@ class User(Base):
     role: Mapped[str | None] = mapped_column(String(200))
     email: Mapped[str] = mapped_column(String(320), unique=True)
     password_hash: Mapped[str] = mapped_column(String(300))
+    telegram_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     ics_token: Mapped[str] = mapped_column(String(64), unique=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

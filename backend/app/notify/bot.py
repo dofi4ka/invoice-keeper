@@ -1,14 +1,19 @@
 """Telegram bot: reminders with a «pay» button, lists of payments, invoice cards and receipts.
 
-The bot only talks in TELEGRAM_CHAT_ID. Navigation edits the message in place.
+The bot answers only users whose Telegram ID is set in the panel, in private chats and in
+TELEGRAM_CHAT_ID (or the administrator's DM when no chat is set). Reminders go to that chat and
+to the responsible people's DMs. Navigation edits the message in place.
 """
 
 import io
 import logging
+from collections.abc import Awaitable, Callable
 from datetime import timedelta
 from html import escape
 
-from aiogram import Bot, Dispatcher, F, Router
+from typing import Any
+
+from aiogram import BaseMiddleware, Bot, Dispatcher, F, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from aiogram.filters import Command, CommandStart
@@ -22,8 +27,12 @@ from aiogram.types import (
     ForceReply,
     InlineKeyboardButton,
     InlineKeyboardMarkup,
+    MenuButtonCommands,
+    MenuButtonWebApp,
     Message,
+    TelegramObject,
     User as TgUser,
+    WebAppInfo,
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,7 +40,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from .. import audit, periods, receipts, services
 from ..config import settings
 from ..db import SessionLocal
-from ..models import Invoice, Occurrence
+from ..models import Invoice, Occurrence, User
 from ..texts import (
     STATUS_LINE,
     d,
@@ -52,7 +61,7 @@ router = Router()
 
 
 def enabled() -> bool:
-    return bot is not None and bool(settings.telegram_chat_id)
+    return bot is not None
 
 
 # --- callback data ------------------------------------------------------------------
@@ -110,7 +119,31 @@ def actor_label(user: TgUser | None) -> str:
 
 
 def in_chat(chat_id: int) -> bool:
-    return str(chat_id) == str(settings.telegram_chat_id).strip()
+    return str(chat_id) == settings.telegram_target
+
+
+class Access(BaseMiddleware):
+    """Drops updates from people without a Telegram ID in the users table and from foreign
+    groups; passes the matching panel user to handlers as `user`."""
+
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        tg_user: TgUser | None = data.get("event_from_user")
+        chat = data.get("event_chat")
+        if tg_user is None or chat is None or not (chat.type == "private" or in_chat(chat.id)):
+            return None
+        async with SessionLocal() as db:
+            user = await db.scalar(select(User).where(User.telegram_id == tg_user.id))
+        if user is None:
+            if isinstance(event, CallbackQuery):
+                await event.answer("Нет доступа: ваш Telegram ID не добавлен в панели", show_alert=True)
+            return None
+        data["user"] = user
+        return await handler(event, data)
 
 
 # --- data ---------------------------------------------------------------------------
@@ -295,7 +328,7 @@ async def on_card(query: CallbackQuery, callback_data: Card):
 
 
 @router.callback_query(Pay.filter())
-async def on_pay(query: CallbackQuery, callback_data: Pay):
+async def on_pay(query: CallbackQuery, callback_data: Pay, user: User):
     async with SessionLocal() as db:
         occ = await load(db, callback_data.occ)
         if occ is None or occ.invoice.archived_at is not None:
@@ -305,20 +338,20 @@ async def on_pay(query: CallbackQuery, callback_data: Pay):
         name = f"«{occ.invoice.name}» за {d(occ.due_date)}"
         if callback_data.paid and not occ.is_paid:
             try:
-                await services.mark_paid(db, occ, periods.today(), None, label)
+                await services.mark_paid(db, occ, periods.today(), user, label)
             except services.DomainError as e:
                 await query.answer(f"{e} — это делается в панели", show_alert=True)
                 return
-            audit.log(db, "occurrence.pay", f"Оплачен {name} через Telegram", actor_name=label, entity_type="occurrence", entity_id=occ.id)
+            audit.log(db, "occurrence.pay", f"Оплачен {name} через Telegram", actor=user, actor_name=label, entity_type="occurrence", entity_id=occ.id)
         elif not callback_data.paid and occ.is_paid:
-            await services.mark_unpaid(db, occ, None, label)
-            audit.log(db, "occurrence.unpay", f"Отменена оплата {name} через Telegram", actor_name=label, entity_type="occurrence", entity_id=occ.id)
+            await services.mark_unpaid(db, occ, user, label)
+            audit.log(db, "occurrence.unpay", f"Отменена оплата {name} через Telegram", actor=user, actor_name=label, entity_type="occurrence", entity_id=occ.id)
         await db.commit()
         await show(query, card_text(occ), card_keyboard(occ, callback_data.src))
 
 
 @router.callback_query(RemindPay.filter())
-async def on_remind_pay(query: CallbackQuery, callback_data: RemindPay):
+async def on_remind_pay(query: CallbackQuery, callback_data: RemindPay, user: User):
     async with SessionLocal() as db:
         occ = await load(db, callback_data.occ)
         if occ is None or occ.invoice.archived_at is not None:
@@ -327,11 +360,11 @@ async def on_remind_pay(query: CallbackQuery, callback_data: RemindPay):
         label = actor_label(query.from_user)
         if not occ.is_paid:
             try:
-                await services.mark_paid(db, occ, periods.today(), None, label)
+                await services.mark_paid(db, occ, periods.today(), user, label)
             except services.DomainError as e:
                 await query.answer(f"{e} — это делается в панели", show_alert=True)
                 return
-            audit.log(db, "occurrence.pay", f"Оплачен «{occ.invoice.name}» за {d(occ.due_date)} через Telegram", actor_name=label, entity_type="occurrence", entity_id=occ.id)
+            audit.log(db, "occurrence.pay", f"Оплачен «{occ.invoice.name}» за {d(occ.due_date)} через Telegram", actor=user, actor_name=label, entity_type="occurrence", entity_id=occ.id)
             await db.commit()
         text = reminder_text(occ) + f"\n\n✅ Оплачено {d(occ.paid_at)} — {escape(label)}"
         kb = InlineKeyboardMarkup(inline_keyboard=[[btn("Открыть карточку инвойса", Card(occ=occ.id, src="notif"))]])
@@ -388,7 +421,7 @@ async def on_attach(query: CallbackQuery, callback_data: Attach, state: FSMConte
 
 
 @router.message(ReceiptUpload.waiting, F.document | F.photo)
-async def on_receipt(message: Message, state: FSMContext):
+async def on_receipt(message: Message, state: FSMContext, user: User):
     data = await state.get_data()
     await state.clear()
     if message.document:
@@ -409,7 +442,7 @@ async def on_receipt(message: Message, state: FSMContext):
             return
         await receipts.store(occ, filename, buf.getvalue(), mime)
         label = actor_label(message.from_user)
-        audit.log(db, "occurrence.receipt", f"Чек «{occ.receipt_name}» к «{occ.invoice.name}» за {d(occ.due_date)} через Telegram", actor_name=label, entity_type="occurrence", entity_id=occ.id)
+        audit.log(db, "occurrence.receipt", f"Чек «{occ.receipt_name}» к «{occ.invoice.name}» за {d(occ.due_date)} через Telegram", actor=user, actor_name=label, entity_type="occurrence", entity_id=occ.id)
         await db.commit()
         await message.answer(card_text(occ), reply_markup=card_keyboard(occ, data.get("src", "list")))
 
@@ -424,7 +457,9 @@ async def on_receipt_wrong(message: Message):
 
 def reminder_text(occ: Occurrence) -> str:
     left = (occ.due_date - periods.today()).days
-    if left > 0:
+    if left < 0:
+        lead = f"Срок оплаты регулярного счета прошёл {-left} {plural(-left, 'день', 'дня', 'дней')} назад, а оплата не отмечена."
+    elif left > 0:
         lead = f"До наступления срока оплаты регулярного счета {plural(left, 'остался', 'осталось', 'осталось')} {left} {plural(left, 'день', 'дня', 'дней')}."
     else:
         lead = "Сегодня наступает срок оплаты регулярного счета."
@@ -440,10 +475,8 @@ def reminder_text(occ: Occurrence) -> str:
     return "\n".join(lines)
 
 
-async def send_reminder(occ: Occurrence) -> bool:
-    if bot is None:
-        return False
-    kb = InlineKeyboardMarkup(
+def reminder_keyboard(occ: Occurrence) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
         inline_keyboard=[
             [
                 btn("Оплатить", RemindPay(occ=occ.id), "success"),
@@ -451,12 +484,41 @@ async def send_reminder(occ: Occurrence) -> bool:
             ]
         ]
     )
+
+
+async def send_assigned(occ: Occurrence, user: User) -> None:
+    """DM to someone just made responsible for a payment that is overdue or due soon."""
+    if bot is None or user.telegram_id is None:
+        return
+    text = f"Вас назначили ответственным за платёж.\n\n{reminder_text(occ)}"
     try:
-        await bot.send_message(settings.telegram_chat_id, reminder_text(occ), reply_markup=kb)
-        return True
-    except Exception:
-        log.exception("Failed to send Telegram reminder for occurrence %s", occ.id)
+        await bot.send_message(user.telegram_id, text, reply_markup=reminder_keyboard(occ))
+    except Exception as e:
+        log.warning("Failed to send Telegram assignment for occurrence %s to %s: %s", occ.id, user.email, e)
+
+
+async def send_reminder(occ: Occurrence) -> bool:
+    """Posts to the shared chat, then to every responsible person's DM. Only a failed chat
+    post returns False (the scheduler retries); a DM fails e.g. when the person never
+    started the bot, which is logged and skipped."""
+    if bot is None:
         return False
+    text, kb = reminder_text(occ), reminder_keyboard(occ)
+    target = settings.telegram_target
+    if target:
+        try:
+            await bot.send_message(target, text, reply_markup=kb)
+        except Exception:
+            log.exception("Failed to send Telegram reminder for occurrence %s", occ.id)
+            return False
+    for user in occ.invoice.responsibles:
+        if user.telegram_id is None or str(user.telegram_id) == target:
+            continue
+        try:
+            await bot.send_message(user.telegram_id, text, reply_markup=kb)
+        except Exception as e:
+            log.warning("Failed to send Telegram reminder for occurrence %s to %s: %s", occ.id, user.email, e)
+    return True
 
 
 # --- lifecycle ----------------------------------------------------------------------
@@ -472,17 +534,32 @@ def create() -> Dispatcher | None:
         default=DefaultBotProperties(parse_mode=ParseMode.HTML, link_preview_is_disabled=True),
     )
     dp = Dispatcher()
-    chat_filter_msg = F.chat.func(lambda chat: in_chat(chat.id))
-    chat_filter_cb = F.message.chat.func(lambda chat: in_chat(chat.id))
-    router.message.filter(chat_filter_msg)
-    router.callback_query.filter(chat_filter_cb)
+    router.message.outer_middleware(Access())
+    router.callback_query.outer_middleware(Access())
     dp.include_router(router)
     return dp
+
+
+async def setup_menu_button() -> None:
+    """Registers the panel (PUBLIC_URL) as the bot's Mini App in the menu button.
+    Telegram accepts only https URLs; otherwise the button stays a list of commands."""
+    assert bot is not None
+    url = settings.public_base
+    if url.startswith("https://"):
+        button = MenuButtonWebApp(text="Панель", web_app=WebAppInfo(url=url + "/"))
+    else:
+        log.info("PUBLIC_URL is not https: the Telegram Mini App is not registered")
+        button = MenuButtonCommands()
+    try:
+        await bot.set_chat_menu_button(menu_button=button)
+    except Exception:
+        log.exception("Failed to set the Telegram menu button")
 
 
 async def run(dp: Dispatcher) -> None:
     assert bot is not None
     await bot.set_my_commands([BotCommand(command="menu", description="Главное меню")])
+    await setup_menu_button()
     await dp.start_polling(bot, handle_signals=False, allowed_updates=["message", "callback_query"])
 
 

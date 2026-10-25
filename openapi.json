@@ -2801,6 +2801,17 @@
             "type": "string",
             "title": "Email"
           },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Id"
+          },
           "is_admin": {
             "type": "boolean",
             "title": "Is Admin"
@@ -2816,6 +2827,7 @@
           "name",
           "role",
           "email",
+          "telegram_id",
           "is_admin",
           "ics_token"
         ],
@@ -3273,6 +3285,19 @@
             "format": "email",
             "title": "Email"
           },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Id",
+            "description": "Числовой ID в Telegram: доступ к боту и личные напоминания"
+          },
           "password": {
             "type": "string",
             "maxLength": 200,
@@ -3313,6 +3338,17 @@
             "type": "string",
             "title": "Email"
           },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Id"
+          },
           "is_admin": {
             "type": "boolean",
             "title": "Is Admin"
@@ -3324,6 +3360,7 @@
           "name",
           "role",
           "email",
+          "telegram_id",
           "is_admin"
         ],
         "title": "UserOut"
@@ -3366,6 +3403,19 @@
               }
             ],
             "title": "Email"
+          },
+          "telegram_id": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telegram Id",
+            "description": "null — отвязать Telegram"
           },
           "password": {
             "anyOf": [
