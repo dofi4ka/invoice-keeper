@@ -5,7 +5,7 @@ import { useAuth, useMe } from "../auth";
 import { relativeAgo } from "../lib/format";
 import type { Notification } from "../types";
 import Popover from "./Popover";
-import { Toaster } from "./ui";
+import { Emoji, Toaster } from "./ui";
 
 const MAIN = [
   ["/", "🏠", "Главная"],
@@ -57,7 +57,7 @@ function Notifications({ placement }: { placement: "right" | "bottom" }) {
   return (
     <>
       <button ref={ref} type="button" className="icon-btn bell" onClick={toggle} data-tip={open ? undefined : "Уведомления"} aria-label="Уведомления">
-        🔔
+        <Emoji e="🔔" />
         {!!data?.unread && <span className="bell-count">{data.unread > 99 ? "99+" : data.unread}</span>}
       </button>
       <Popover anchor={ref} open={open} onClose={close} className="notifs" placement={placement} align="end">
@@ -97,7 +97,9 @@ export default function Nav() {
 
   const link = ([to, icon, label]: string[]) => (
     <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => `nav-link ${isActive ? "active" : ""}`}>
-      <span>{icon}</span>
+      <span>
+        <Emoji e={icon} />
+      </span>
       {label}
     </NavLink>
   );

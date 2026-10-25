@@ -6,7 +6,7 @@ import CreateInvoiceForm from "../components/CreateInvoiceForm";
 import InvoiceCard from "../components/InvoiceCard";
 import InvoicePanel from "../components/InvoicePanel";
 import { MultiSelect } from "../components/Select";
-import { CategoryIcon, Side } from "../components/ui";
+import { CategoryIcon, Emoji, Side } from "../components/ui";
 import { CURRENCY_LABEL, CURRENCY_SIGN } from "../lib/format";
 import type { CategoryWithSpend, Currency, InvoiceListItem } from "../types";
 import { CURRENCIES } from "../types";
@@ -122,7 +122,7 @@ export default function Invoices() {
           ) : selectedId ? (
             <InvoicePanel invoiceId={selectedId} occurrenceId={occurrenceId} onArchived={() => select(selectedId)} />
           ) : (
-            <div className="side-empty">👆 Выберите платёж</div>
+            <div className="side-empty"><span><Emoji e="👆" /> Выберите платёж</span></div>
           )}
         </Side>
       </div>

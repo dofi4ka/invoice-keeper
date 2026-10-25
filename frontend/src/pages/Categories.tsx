@@ -1,7 +1,7 @@
 import { Icon } from "@iconify/react";
 import { useEffect, useState } from "react";
 import { api, invalidate, useQuery } from "../api";
-import { CategoryIcon, Kv, Side, toast } from "../components/ui";
+import { CategoryIcon, Emoji, Kv, Side, toast } from "../components/ui";
 import { CURRENCIES, type CategoryWithSpend } from "../types";
 import { complex, type Totals } from "../lib/format";
 
@@ -166,7 +166,7 @@ export default function Categories() {
         </div>
         <Side open={selected !== null} onClose={() => setSelected(null)}>
           {selected === null ? (
-            <div className="side-empty">👆 Выберите категорию</div>
+            <div className="side-empty"><span><Emoji e="👆" /> Выберите категорию</span></div>
           ) : (
             <CategoryForm key={String(selected)} category={current} onDone={(id) => setSelected(id)} />
           )}

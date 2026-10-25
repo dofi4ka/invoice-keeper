@@ -4,7 +4,7 @@ import { useMe } from "../auth";
 import InvoiceCard from "../components/InvoiceCard";
 import InvoicePanel from "../components/InvoicePanel";
 import Popover from "../components/Popover";
-import { CategoryIcon, Seg, toast } from "../components/ui";
+import { CategoryIcon, Emoji, Seg, toast } from "../components/ui";
 import { MONTHS, WEEKDAYS, addDays, addTo, complex, iso, longDate, money, rangeTitle, today, type Totals } from "../lib/format";
 import type { Occurrence } from "../types";
 
@@ -113,13 +113,13 @@ export default function CalendarPage() {
         <div className="cal-main">
           <div className="cal-controls">
             <button type="button" className="icon-btn" aria-label="Предыдущий месяц" onClick={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))}>
-              ⬅️
+              <Emoji e="⬅️" />
             </button>
             <span className="cal-title">
               {MONTHS[view.getMonth()]} {view.getFullYear()}
             </span>
             <button type="button" className="icon-btn" aria-label="Следующий месяц" onClick={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))}>
-              ➡️
+              <Emoji e="➡️" />
             </button>
             <span className="grow" />
             <Seg
@@ -190,7 +190,7 @@ export default function CalendarPage() {
           {selected ? (
             <>
               <button type="button" className="link-btn" style={{ alignSelf: "flex-start" }} onClick={() => setSelected(null)}>
-                ⬅️ Назад к платежам
+                <Emoji e="⬅️" /> Назад к платежам
               </button>
               <InvoicePanel invoiceId={selected.invoice_id} occurrenceId={selected.id} onArchived={() => setSelected(null)} />
             </>

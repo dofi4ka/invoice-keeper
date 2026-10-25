@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api, invalidate, useQuery } from "../api";
-import { EyeIcon, Kv, Side, toast } from "../components/ui";
+import { Emoji, EyeIcon, Kv, Side, toast } from "../components/ui";
 import type { User } from "../types";
 
 /** CreateEditUserForm.html */
@@ -138,7 +138,7 @@ export default function Users() {
         </div>
         <Side open={selected !== null} onClose={() => setSelected(null)}>
           {selected === null ? (
-            <div className="side-empty">👆 Выберите сотрудника</div>
+            <div className="side-empty"><span><Emoji e="👆" /> Выберите сотрудника</span></div>
           ) : (
             <UserForm key={String(selected)} user={current} onDone={(id) => setSelected(id)} />
           )}

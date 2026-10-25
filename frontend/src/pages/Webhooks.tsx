@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api, invalidate, useQuery } from "../api";
 import { Select } from "../components/Select";
-import { Kv, Side, Switch, toast } from "../components/ui";
+import { Emoji, Kv, Side, Switch, toast } from "../components/ui";
 import { dateTime } from "../lib/format";
 import type { Webhook } from "../types";
 
@@ -294,7 +294,7 @@ export default function Webhooks() {
         </div>
         <Side open={selected !== null} onClose={() => setSelected(null)}>
           {selected === null ? (
-            <div className="side-empty">👆 Выберите вебхук</div>
+            <div className="side-empty"><span><Emoji e="👆" /> Выберите вебхук</span></div>
           ) : (
             <WebhookForm key={String(selected)} hook={current} meta={meta} onDone={(id) => setSelected(id)} />
           )}

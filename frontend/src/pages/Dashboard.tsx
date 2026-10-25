@@ -6,7 +6,7 @@ import { qs, useQuery } from "../api";
 import { useMe } from "../auth";
 import { CURRENCY_COLOR, CURRENCY_FILL, legendBottom, tooltipStyle } from "../components/charts";
 import InvoiceCard from "../components/InvoiceCard";
-import { Seg, Stepper } from "../components/ui";
+import { Emoji, Seg, Stepper } from "../components/ui";
 import { MONTHS, MONTHS_TICK, addDays, iso, money, parseDate, today } from "../lib/format";
 import type { Currency, Occurrence, Rates } from "../types";
 import { CURRENCIES } from "../types";
@@ -211,7 +211,7 @@ export default function Dashboard() {
             <InvoiceCard key={o.id} invoice={o.invoice} occurrence={o} onClick={() => navigate(`/invoices?invoice=${o.invoice_id}&occurrence=${o.id}`)} />
           ))}
         </div>
-        {upcoming && list.length === 0 && <div className="card empty">Ближайших платежей нет 🎉</div>}
+        {upcoming && list.length === 0 && <div className="card empty">Ближайших платежей нет <Emoji e="🎉" /></div>}
         <Link to="/calendar" className="link-btn">
           Открыть календарь{upcoming && upcoming.length > list.length ? ` · ещё ${upcoming.length - list.length}` : ""} →
         </Link>

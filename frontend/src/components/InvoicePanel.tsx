@@ -6,7 +6,7 @@ import type { CategoryWithSpend, Invoice, Occurrence, User } from "../types";
 import DateInput from "./DateInput";
 import Popover from "./Popover";
 import { Select } from "./Select";
-import { CategoryIcon, Kv, toast } from "./ui";
+import { CategoryIcon, Emoji, Kv, toast } from "./ui";
 
 const STATUS_TEXT = { paid: "Оплачено", overdue: "Просрочено", soon: "Не оплачено", upcoming: "Не оплачено" } as const;
 
@@ -369,7 +369,7 @@ export default function InvoicePanel({ invoiceId, occurrenceId, onArchived }: Pr
         <div className="period-box">
           <div className="period-head">
             <button type="button" className="icon-btn" disabled={i <= 0} onClick={() => go(i - 1)} aria-label="Предыдущий период">
-              ⬅️
+              <Emoji e="⬅️" />
             </button>
             <p>{periodTitle(invoice.recurrence, occ.due_date)}</p>
             <button
@@ -379,7 +379,7 @@ export default function InvoicePanel({ invoiceId, occurrenceId, onArchived }: Pr
               onClick={() => go(i + 1)}
               aria-label="Следующий период"
             >
-              ➡️
+              <Emoji e="➡️" />
             </button>
           </div>
           <Period occ={occ} archived={invoice.archived} />

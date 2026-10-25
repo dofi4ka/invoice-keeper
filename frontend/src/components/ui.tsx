@@ -1,6 +1,15 @@
 import { Icon } from "@iconify/react";
 import { useEffect, useState, type ReactNode } from "react";
 
+// Apple emoji artwork (emoji-datasource-apple), so emoji look the same on every platform.
+const EMOJI = import.meta.glob<string>("../assets/emoji/*.png", { eager: true, import: "default" });
+
+export function Emoji({ e }: { e: string }) {
+  const code = [...e].map((c) => c.codePointAt(0)!.toString(16)).join("-");
+  const src = EMOJI[`../assets/emoji/${code}.png`];
+  return src ? <img className="emoji" src={src} alt={e} draggable={false} /> : <>{e}</>;
+}
+
 export function Seg<T extends string>({ value, options, onChange }: { value: T; options: [T, string][]; onChange: (v: T) => void }) {
   return (
     <div className="seg" role="tablist">
@@ -18,13 +27,13 @@ export function Stepper({ value, onPrev, onNext, tip }: { value: ReactNode; onPr
   return (
     <div className="stepper">
       <button type="button" className="icon-btn" onClick={onPrev} aria-label="Назад">
-        ⬅️
+        <Emoji e="⬅️" />
       </button>
       <span className="value" data-tip={tip}>
         {value}
       </span>
       <button type="button" className="icon-btn" onClick={onNext} aria-label="Вперёд">
-        ➡️
+        <Emoji e="➡️" />
       </button>
     </div>
   );

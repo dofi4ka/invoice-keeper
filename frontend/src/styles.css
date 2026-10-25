@@ -339,6 +339,14 @@ textarea.input {
   width: 100%;
 }
 
+.emoji {
+  display: inline-block;
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.22em;
+  user-select: none;
+}
+
 .icon-btn {
   display: inline-grid;
   place-items: center;
