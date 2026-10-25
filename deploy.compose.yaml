@@ -1,6 +1,13 @@
-# Server deployment behind Traefik (TLS is terminated by Cloudflare):
-#   docker compose -f deploy.compose.yaml up -d --build
+# Server deployment behind Traefik (TLS is terminated by Cloudflare).
+# Images are built and pushed by .github/workflows/docker-publish.yml to GHCR.
+#
+#   docker compose -f deploy.compose.yaml pull
+#   docker compose -f deploy.compose.yaml up -d
+#
 # Requires the external "traefik" network and HOSTNAME / POSTGRES_PASSWORD in .env.
+# Optional: IMAGE_REGISTRY (default ghcr.io/dofi4ka/invoice-keeper) and IMAGE_TAG (default latest)
+# to pin a release, e.g. IMAGE_TAG=v1.2.3. For a private registry run
+# `docker login ghcr.io -u <user> -p <token>` first.
 
 services:
   db:
@@ -21,7 +28,8 @@ services:
       retries: 20
 
   backend:
-    build: ./backend
+    image: ${IMAGE_REGISTRY:-ghcr.io/dofi4ka/invoice-keeper}/backend:${IMAGE_TAG:-latest}
+    pull_policy: always
     restart: unless-stopped
     env_file: .env
     environment:
@@ -38,7 +46,8 @@ services:
         condition: service_healthy
 
   frontend:
-    build: ./frontend
+    image: ${IMAGE_REGISTRY:-ghcr.io/dofi4ka/invoice-keeper}/frontend:${IMAGE_TAG:-latest}
+    pull_policy: always
     restart: unless-stopped
     depends_on:
       - backend
