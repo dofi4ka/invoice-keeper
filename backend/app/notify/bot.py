@@ -2,13 +2,16 @@
 
 The bot answers only users whose Telegram ID is set in the panel, in private chats and in
 TELEGRAM_CHAT_ID (or the administrator's DM when no chat is set). Reminders go to that chat and
-to the responsible people's DMs. Navigation edits the message in place.
+to the responsible people's DMs. Navigation edits the message in place. /myid answers anyone,
+so a new person can find out the ID to enter in the panel.
 """
 
 import io
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from datetime import timedelta
+from decimal import Decimal
 from html import escape
 
 from typing import Any
@@ -57,6 +60,7 @@ log = logging.getLogger(__name__)
 ARCHIVE_PAGE = 6
 
 bot: Bot | None = None
+public = Router()  # no access check
 router = Router()
 
 
@@ -102,7 +106,16 @@ class RemindPay(CallbackData, prefix="rp"):
     occ: int
 
 
+class SetAmount(CallbackData, prefix="s"):
+    occ: int
+    src: str
+
+
 class ReceiptUpload(StatesGroup):
+    waiting = State()
+
+
+class AmountInput(StatesGroup):
     waiting = State()
 
 
@@ -181,6 +194,15 @@ def occ_amount(occ: Occurrence) -> str:
         occ.amount if occ.amount is not None else occ.invoice.amount,
         occ.invoice.currency,
     )
+
+
+def parse_amount(text: str) -> Decimal | None:
+    """«1 500,50 ₽» → 1500.50; None unless it fits a positive Numeric(14, 2)."""
+    text = re.sub(r"[\s₽$€]", "", text)
+    if not re.fullmatch(r"\d{1,12}([.,]\d{1,2})?", text):
+        return None
+    value = Decimal(text.replace(",", "."))
+    return value if value > 0 else None
 
 
 # --- screens ------------------------------------------------------------------------
@@ -281,15 +303,17 @@ def card_keyboard(occ: Occurrence, src: str) -> InlineKeyboardMarkup:
     else:
         pay = btn("💳 Оплатить", Pay(occ=occ.id, src=src, paid=True), "primary")
     back = Menu(screen="due" if src == "due" else "list" if src == "list" else "main")
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [pay, btn("📎 Добавить чек", Attach(occ=occ.id, src=src))],
-            [
-                btn("⬅️ Назад", back),
-                btn("🧾 Просмотреть чек", Archive(occ=occ.id, src=src, page=0)),
-            ],
+    rows = [[pay, btn("📎 Добавить чек", Attach(occ=occ.id, src=src))]]
+    if occ.invoice.amount_type == "actual" and occ.invoice.archived_at is None:
+        label = "✏️ Изменить сумму" if occ.amount is not None else "✏️ Указать сумму"
+        rows.append([btn(label, SetAmount(occ=occ.id, src=src))])
+    rows.append(
+        [
+            btn("⬅️ Назад", back),
+            btn("🧾 Просмотреть чек", Archive(occ=occ.id, src=src, page=0)),
         ]
     )
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 async def archive_screen(db: AsyncSession, occ: Occurrence, src: str, page: int):
@@ -341,6 +365,16 @@ async def show(
         await target.answer(text, reply_markup=kb)
 
 
+@public.message(Command("myid"))
+async def on_myid(message: Message):
+    if message.from_user is None:
+        return
+    text = f"Ваш Telegram ID: <code>{message.from_user.id}</code>"
+    if message.chat.type != "private":
+        text += f"\nID этого чата: <code>{message.chat.id}</code>"
+    await message.answer(text)
+
+
 @router.message(CommandStart())
 @router.message(Command("menu"))
 async def on_start(message: Message, state: FSMContext):
@@ -370,7 +404,9 @@ async def on_card(query: CallbackQuery, callback_data: Card):
 
 
 @router.callback_query(Pay.filter())
-async def on_pay(query: CallbackQuery, callback_data: Pay, user: User):
+async def on_pay(
+    query: CallbackQuery, callback_data: Pay, user: User, state: FSMContext
+):
     async with SessionLocal() as db:
         occ = await load(db, callback_data.occ)
         if occ is None or occ.invoice.archived_at is not None:
@@ -381,8 +417,8 @@ async def on_pay(query: CallbackQuery, callback_data: Pay, user: User):
         if callback_data.paid and not occ.is_paid:
             try:
                 await services.mark_paid(db, occ, periods.today(), user, label)
-            except services.DomainError as e:
-                await query.answer(f"{e} — это делается в панели", show_alert=True)
+            except services.DomainError:
+                await ask_amount(query, state, occ, callback_data.src, pay=True)
                 return
             audit.log(
                 db,
@@ -409,7 +445,9 @@ async def on_pay(query: CallbackQuery, callback_data: Pay, user: User):
 
 
 @router.callback_query(RemindPay.filter())
-async def on_remind_pay(query: CallbackQuery, callback_data: RemindPay, user: User):
+async def on_remind_pay(
+    query: CallbackQuery, callback_data: RemindPay, user: User, state: FSMContext
+):
     async with SessionLocal() as db:
         occ = await load(db, callback_data.occ)
         if occ is None or occ.invoice.archived_at is not None:
@@ -419,8 +457,8 @@ async def on_remind_pay(query: CallbackQuery, callback_data: RemindPay, user: Us
         if not occ.is_paid:
             try:
                 await services.mark_paid(db, occ, periods.today(), user, label)
-            except services.DomainError as e:
-                await query.answer(f"{e} — это делается в панели", show_alert=True)
+            except services.DomainError:
+                await ask_amount(query, state, occ, "notif", pay=True)
                 return
             audit.log(
                 db,
@@ -550,6 +588,84 @@ async def on_receipt_wrong(message: Message):
     await message.answer("Нужен файл или фото чека. /menu — отмена.")
 
 
+async def ask_amount(
+    query: CallbackQuery, state: FSMContext, occ: Occurrence, src: str, pay: bool
+) -> None:
+    """Asks for the period's actual amount; with `pay` the period is marked paid right after."""
+    await state.set_state(AmountInput.waiting)
+    await state.update_data(occ=occ.id, src=src, pay=pay)
+    lead = "Сначала укажите сумму. " if pay else ""
+    await query.message.answer(
+        f"{lead}Ответьте на это сообщение фактической суммой за «{escape(occ.invoice.name)}» "
+        f"за {d(occ.due_date)} в {occ.invoice.currency}, например 1500,50. /menu — отмена.",
+        reply_markup=ForceReply(selective=True, input_field_placeholder="Сумма"),
+    )
+    await query.answer()
+
+
+@router.callback_query(SetAmount.filter())
+async def on_set_amount(
+    query: CallbackQuery, callback_data: SetAmount, state: FSMContext
+):
+    async with SessionLocal() as db:
+        occ = await load(db, callback_data.occ)
+        if (
+            occ is None
+            or occ.invoice.archived_at is not None
+            or occ.invoice.amount_type != "actual"
+        ):
+            await query.answer("Платёж не найден", show_alert=True)
+            return
+        await ask_amount(query, state, occ, callback_data.src, pay=False)
+
+
+@router.message(AmountInput.waiting, F.text)
+async def on_amount(message: Message, state: FSMContext, user: User):
+    amount = parse_amount(message.text)
+    if amount is None:
+        await message.answer("Не похоже на сумму, например: 1500,50. /menu — отмена.")
+        return
+    data = await state.get_data()
+    await state.clear()
+    async with SessionLocal() as db:
+        occ = await load(db, data["occ"])
+        if occ is None or occ.invoice.archived_at is not None:
+            await message.answer("Платёж не найден")
+            return
+        label = actor_label(message.from_user)
+        name = f"«{occ.invoice.name}» за {d(occ.due_date)}"
+        occ.amount = amount
+        audit.log(
+            db,
+            "occurrence.update",
+            f"{name}: сумма {money(amount, occ.invoice.currency)} через Telegram",
+            actor=user,
+            actor_name=label,
+            entity_type="occurrence",
+            entity_id=occ.id,
+        )
+        if data.get("pay") and not occ.is_paid:
+            await services.mark_paid(db, occ, periods.today(), user, label)
+            audit.log(
+                db,
+                "occurrence.pay",
+                f"Оплачен {name} через Telegram",
+                actor=user,
+                actor_name=label,
+                entity_type="occurrence",
+                entity_id=occ.id,
+            )
+        await db.commit()
+        await message.answer(
+            card_text(occ), reply_markup=card_keyboard(occ, data.get("src", "list"))
+        )
+
+
+@router.message(AmountInput.waiting)
+async def on_amount_wrong(message: Message):
+    await message.answer("Нужна сумма числом, например: 1500,50. /menu — отмена.")
+
+
 # --- reminders ----------------------------------------------------------------------
 
 
@@ -648,7 +764,7 @@ def create() -> Dispatcher | None:
     dp = Dispatcher()
     router.message.outer_middleware(Access())
     router.callback_query.outer_middleware(Access())
-    dp.include_router(router)
+    dp.include_routers(public, router)
     return dp
 
 
@@ -670,7 +786,12 @@ async def setup_menu_button() -> None:
 
 async def run(dp: Dispatcher) -> None:
     assert bot is not None
-    await bot.set_my_commands([BotCommand(command="menu", description="Главное меню")])
+    await bot.set_my_commands(
+        [
+            BotCommand(command="menu", description="Главное меню"),
+            BotCommand(command="myid", description="Мой Telegram ID"),
+        ]
+    )
     await setup_menu_button()
     await dp.start_polling(
         bot, handle_signals=False, allowed_updates=["message", "callback_query"]

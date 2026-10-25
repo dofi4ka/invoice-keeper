@@ -153,3 +153,19 @@ async def archive_invoice(invoice_id: int, request: Request, db: DB, admin: Admi
     audit.log(db, "invoice.archive", f"Архивирован «{invoice.name}»", actor=admin, entity_type="invoice", entity_id=invoice.id, ip=client_ip(request))
     await events.emit(db, "invoice.archived", invoice, actor=admin)
     await db.commit()
+
+
+@router.post(
+    "/{invoice_id}/unarchive",
+    response_model=schemas.InvoiceOut,
+    summary="Возобновление архивного платежа; периоды за время архива не восстанавливаются",
+)
+async def unarchive_invoice(invoice_id: int, request: Request, db: DB, admin: AdminUser):
+    invoice = await get_invoice(db, invoice_id, admin)
+    if invoice.archived_at is not None:
+        await services.unarchive(db, invoice)
+        audit.log(db, "invoice.unarchive", f"Разархивирован «{invoice.name}»", actor=admin, entity_type="invoice", entity_id=invoice.id, ip=client_ip(request))
+        await events.emit(db, "invoice.unarchived", invoice, actor=admin)
+        await db.commit()
+        scheduler.wake()
+    return services.invoice_out(invoice)

@@ -38,6 +38,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/auth/telegram:
+    post:
+      tags:
+      - Авторизация
+      summary: Автовход из Telegram Mini App по Telegram ID пользователя
+      operationId: telegram_login_api_v1_auth_telegram_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramLoginIn'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginOut'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /api/v1/auth/me:
     get:
       tags:
@@ -234,6 +259,34 @@ paths:
                   $ref: '#/components/schemas/OccurrenceOut'
                 title: Response Invoice Occurrences Api V1 Recurring Payments  Invoice
                   Id  Occurrences Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /api/v1/recurring-payments/{invoice_id}/unarchive:
+    post:
+      tags:
+      - Регулярные платежи
+      summary: Возобновление архивного платежа; периоды за время архива не восстанавливаются
+      operationId: unarchive_invoice_api_v1_recurring_payments__invoice_id__unarchive_post
+      security:
+      - HTTPBearer: []
+      parameters:
+      - name: invoice_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Invoice Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InvoiceOut'
         '422':
           description: Validation Error
           content:
@@ -2033,6 +2086,17 @@ components:
       - date_to
       - currencies
       title: SummaryOut
+    TelegramLoginIn:
+      properties:
+        init_data:
+          type: string
+          title: Init Data
+          description: Telegram.WebApp.initData — строка запуска Mini App, подписанная
+            ботом
+      type: object
+      required:
+      - init_data
+      title: TelegramLoginIn
     UserCreate:
       properties:
         name:

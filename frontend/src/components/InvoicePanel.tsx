@@ -401,6 +401,25 @@ export default function InvoicePanel({ invoiceId, occurrenceId, onArchived }: Pr
           Архивировать
         </button>
       )}
+      {isAdmin && invoice.archived && (
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={async () => {
+            if (!window.confirm(`Разархивировать «${invoice.name}»? Периоды, пришедшиеся на время архива, не восстановятся.`)) return;
+            try {
+              await api(`/recurring-payments/${invoice.id}/unarchive`, { method: "POST" });
+              toast("Платёж снова активен");
+              setPinnedId(null);
+              invalidate();
+            } catch (e) {
+              toast((e as Error).message);
+            }
+          }}
+        >
+          Разархивировать
+        </button>
+      )}
     </div>
   );
 }

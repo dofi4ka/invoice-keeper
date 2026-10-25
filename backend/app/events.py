@@ -24,6 +24,7 @@ EVENTS = {
     "occurrence.unpaid": "Оплата отменена",
     "invoice.created": "Новый платёж",
     "invoice.archived": "Платёж архивирован",
+    "invoice.unarchived": "Платёж разархивирован",
 }
 
 _tasks: set[asyncio.Task] = set()
@@ -87,6 +88,8 @@ def notification_text(event: str, invoice: Invoice, occ: Occurrence | None, who:
             return f"Новый платёж «{invoice.name}», {amount}"
         case "invoice.archived":
             return f"Платёж «{invoice.name}» архивирован"
+        case "invoice.unarchived":
+            return f"Платёж «{invoice.name}» снова активен"
     return f"{EVENTS[event]}: {invoice.name}"
 
 

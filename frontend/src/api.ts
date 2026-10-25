@@ -13,6 +13,13 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn;
 }
 
+// Telegram Web opens the Mini App in a cross-site iframe where the session cookie is not sent,
+// so a session started from Telegram is also passed as a Bearer token.
+let bearerToken: string | null = null;
+export function setBearerToken(token: string | null) {
+  bearerToken = token;
+}
+
 function errorMessage(body: unknown, status: number): string {
   const detail = (body as { detail?: unknown })?.detail;
   if (typeof detail === "string") return detail;
@@ -28,6 +35,7 @@ export async function api<T = unknown>(path: string, init: RequestInit & { json?
   const { json, ...rest } = init;
   const headers = new Headers(rest.headers);
   if (json !== undefined) headers.set("Content-Type", "application/json");
+  if (bearerToken && !headers.has("Authorization")) headers.set("Authorization", `Bearer ${bearerToken}`);
   const response = await fetch(`/api/v1${path}`, {
     credentials: "same-origin",
     ...rest,
@@ -37,7 +45,7 @@ export async function api<T = unknown>(path: string, init: RequestInit & { json?
   if (response.status === 204) return undefined as T;
   const body = response.headers.get("content-type")?.includes("json") ? await response.json() : null;
   if (!response.ok) {
-    if (response.status === 401 && !path.startsWith("/auth/login")) onUnauthorized();
+    if (response.status === 401 && !path.startsWith("/auth/login") && !path.startsWith("/auth/telegram")) onUnauthorized();
     throw new ApiError(response.status, errorMessage(body, response.status));
   }
   return body as T;

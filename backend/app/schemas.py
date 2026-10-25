@@ -35,6 +35,10 @@ class MeOut(UserOut):
     ics_token: str
 
 
+class TelegramLoginIn(BaseModel):
+    init_data: str = Field(description="Telegram.WebApp.initData — строка запуска Mini App, подписанная ботом")
+
+
 class LoginOut(BaseModel):
     token: str = Field(description="Также выставляется cookie; для API передавайте как Bearer")
     user: MeOut

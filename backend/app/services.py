@@ -18,7 +18,8 @@ async def ensure_occurrences(db: AsyncSession, invoice: Invoice, *, mark_past_pa
 
     With `mark_past_paid` (invoice creation with a past first date) periods that are
     already due before today are stored as paid without an actual payment date.
-    Returns how many periods were marked as paid that way.
+    Returns how many periods were marked as paid that way. Periods that fell due while the
+    invoice was archived (missing ones before `resumed_on`) are not restored.
     """
     if invoice.archived_at is not None:
         return 0
@@ -26,7 +27,7 @@ async def ensure_occurrences(db: AsyncSession, invoice: Invoice, *, mark_past_pa
     today = periods.today()
     past_paid = 0
     for seq, due in periods.iter_due_dates(invoice.start_date, invoice.recurrence, periods.horizon()):
-        if seq in existing:
+        if seq in existing or (invoice.resumed_on is not None and due < invoice.resumed_on):
             continue
         paid = mark_past_paid and due < today
         past_paid += paid
@@ -155,6 +156,13 @@ async def archive(db: AsyncSession, invoice: Invoice) -> None:
             )
         )
     )
+
+
+async def unarchive(db: AsyncSession, invoice: Invoice) -> None:
+    """Resumes the invoice from today: periods due while it was archived are skipped for good."""
+    invoice.archived_at = None
+    invoice.resumed_on = periods.today()
+    await ensure_occurrences(db, invoice)
 
 
 async def mark_paid(

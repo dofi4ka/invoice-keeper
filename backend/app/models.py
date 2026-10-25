@@ -82,6 +82,8 @@ class Invoice(Base):
     start_date: Mapped[date] = mapped_column(Date)
     link: Mapped[str | None] = mapped_column(String(1000))
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # set on unarchiving: missing periods due before this date fell into the archived time
+    resumed_on: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     category: Mapped[Category | None] = relationship(lazy="joined")

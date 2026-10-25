@@ -29,3 +29,4 @@ async def create_schema() -> None:
         await conn.execute(
             text("CREATE UNIQUE INDEX IF NOT EXISTS users_telegram_id_key ON users (telegram_id)")
         )
+        await conn.execute(text("ALTER TABLE invoices ADD COLUMN IF NOT EXISTS resumed_on DATE"))

@@ -18,7 +18,7 @@ function statusKey(i: InvoiceListItem): StatusFilter {
   return i.next_occurrence?.status ?? "upcoming";
 }
 
-/** Next unpaid period first; paid one-off payments go to the end, archived after them. */
+/** Next unpaid period first; paid one-off payments go to the end, archived (admins only) after them. */
 function sortKey(i: InvoiceListItem): string {
   const group = i.archived ? "2" : i.next_occurrence?.is_paid ? "1" : "0";
   return `${group}${i.next_occurrence?.due_date ?? "9999"}${i.name}`;
@@ -50,7 +50,6 @@ export default function Invoices() {
     return (invoices ?? [])
       .filter((i) => !q || i.name.toLowerCase().includes(q) || i.category?.name.toLowerCase().includes(q))
       .filter((i) => !statuses.length || statuses.includes(statusKey(i)))
-      .filter((i) => !(statuses.length === 0 && i.archived) || statuses.includes("archived"))
       .filter((i) => !currencies.length || currencies.includes(i.currency))
       .filter((i) => !categoryIds.length || (i.category && categoryIds.includes(i.category.id)))
       .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));

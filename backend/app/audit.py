@@ -10,6 +10,7 @@ ACTIONS = {
     "invoice.create": "Создание платежа",
     "invoice.update": "Изменение платежа",
     "invoice.archive": "Архивация платежа",
+    "invoice.unarchive": "Разархивация платежа",
     "occurrence.pay": "Отметка оплаты",
     "occurrence.unpay": "Отмена оплаты",
     "occurrence.update": "Изменение периода",
