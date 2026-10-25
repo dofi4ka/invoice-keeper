@@ -147,3 +147,5 @@ curl -s localhost:8080/api/v1/payment-occurrences?status=overdue -H "Authorizati
 curl -s -X PATCH localhost:8080/api/v1/payment-occurrences/42 -H "Authorization: Bearer $TOKEN" \
   -H 'content-type: application/json' -d '{"is_paid": true, "paid_at": "2026-10-24"}'
 ```
+  
+Ставьте клубнички 🍓🍓🍓
