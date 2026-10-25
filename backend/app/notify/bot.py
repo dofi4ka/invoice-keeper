@@ -106,7 +106,9 @@ class ReceiptUpload(StatesGroup):
     waiting = State()
 
 
-def btn(text: str, data: CallbackData | str, style: str | None = None) -> InlineKeyboardButton:
+def btn(
+    text: str, data: CallbackData | str, style: str | None = None
+) -> InlineKeyboardButton:
     cb = data if isinstance(data, str) else data.pack()
     return InlineKeyboardButton(text=text, callback_data=cb, style=style)
 
@@ -134,13 +136,19 @@ class Access(BaseMiddleware):
     ) -> Any:
         tg_user: TgUser | None = data.get("event_from_user")
         chat = data.get("event_chat")
-        if tg_user is None or chat is None or not (chat.type == "private" or in_chat(chat.id)):
+        if (
+            tg_user is None
+            or chat is None
+            or not (chat.type == "private" or in_chat(chat.id))
+        ):
             return None
         async with SessionLocal() as db:
             user = await db.scalar(select(User).where(User.telegram_id == tg_user.id))
         if user is None:
             if isinstance(event, CallbackQuery):
-                await event.answer("Нет доступа: ваш Telegram ID не добавлен в панели", show_alert=True)
+                await event.answer(
+                    "Нет доступа: ваш Telegram ID не добавлен в панели", show_alert=True
+                )
             return None
         data["user"] = user
         return await handler(event, data)
@@ -156,16 +164,23 @@ def active(stmt):
 async def due_list(db: AsyncSession) -> list[Occurrence]:
     """Overdue periods and those due within the reminder window."""
     limit = periods.today() + timedelta(days=settings.reminder_days)
-    stmt = active(select(Occurrence)).where(Occurrence.is_paid.is_(False), Occurrence.due_date <= limit)
+    stmt = active(select(Occurrence)).where(
+        Occurrence.is_paid.is_(False), Occurrence.due_date <= limit
+    )
     return list(await db.scalars(stmt.order_by(Occurrence.due_date, Invoice.name)))
 
 
 async def load(db: AsyncSession, occ_id: int) -> Occurrence | None:
-    return await db.scalar(services.visible(select(Occurrence).where(Occurrence.id == occ_id)))
+    return await db.scalar(
+        services.visible(select(Occurrence).where(Occurrence.id == occ_id))
+    )
 
 
 def occ_amount(occ: Occurrence) -> str:
-    return money(occ.amount if occ.amount is not None else occ.invoice.amount, occ.invoice.currency)
+    return money(
+        occ.amount if occ.amount is not None else occ.invoice.amount,
+        occ.invoice.currency,
+    )
 
 
 # --- screens ------------------------------------------------------------------------
@@ -194,24 +209,42 @@ async def due_screen(db: AsyncSession) -> tuple[str, InlineKeyboardMarkup]:
             f"Срок: {d(occ.due_date)} ({due_hint(False, occ.due_date, today)})"
         )
         overdue = occ.due_date < today
-        rows.append([btn(f"К оплате {occ.invoice.name}", Card(occ=occ.id, src="due"), "danger" if overdue else None)])
+        rows.append(
+            [
+                btn(
+                    f"К оплате {occ.invoice.name}",
+                    Card(occ=occ.id, src="due"),
+                    "danger" if overdue else None,
+                )
+            ]
+        )
     if not items:
         lines.append("\nВсё оплачено вовремя ✨")
-    rows.append([btn("Назад в главное меню", Menu(screen="main"))])
+    rows.append([btn("⬅️ Назад в главное меню", Menu(screen="main"))])
     return "\n".join(lines), InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 async def list_screen(db: AsyncSession) -> tuple[str, InlineKeyboardMarkup]:
-    invoices = list(await db.scalars(select(Invoice).where(Invoice.archived_at.is_(None)).order_by(Invoice.name)))
+    invoices = list(
+        await db.scalars(
+            select(Invoice).where(Invoice.archived_at.is_(None)).order_by(Invoice.name)
+        )
+    )
     nexts = await services.next_occurrences(db, [i.id for i in invoices])
     rows = []
     for inv in invoices:
         occ = nexts.get(inv.id)
         if occ is None:
             continue
-        rows.append([btn(f"{inv.name} - {occ_amount(occ)}", Card(occ=occ.id, src="list"))])
-    rows.append([btn("Назад в главное меню", Menu(screen="main"))])
-    text = "<b>Список инвойсов:</b>" if invoices else "<b>Список инвойсов:</b>\n\nПлатежей пока нет"
+        rows.append(
+            [btn(f"{inv.name} - {occ_amount(occ)}", Card(occ=occ.id, src="list"))]
+        )
+    rows.append([btn("⬅️ Назад в главное меню", Menu(screen="main"))])
+    text = (
+        "<b>Список инвойсов:</b>"
+        if invoices
+        else "<b>Список инвойсов:</b>\n\nПлатежей пока нет"
+    )
     return text, InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -235,7 +268,9 @@ def card_text(occ: Occurrence) -> str:
     if inv.link:
         lines.append(f"🌐 Биллинг: {escape(inv.link)}")
     lines.append(f"Текущий статус: {STATUS_LINE[status]}")
-    receipt = f"прикреплен: {escape(occ.receipt_name)}" if occ.receipt_name else "ожидается"
+    receipt = (
+        f"прикреплен: {escape(occ.receipt_name)}" if occ.receipt_name else "ожидается"
+    )
     lines.append(f"Чек: {receipt}")
     return "\n".join(lines)
 
@@ -249,7 +284,10 @@ def card_keyboard(occ: Occurrence, src: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [pay, btn("📎 Добавить чек", Attach(occ=occ.id, src=src))],
-            [btn("◀️ Назад", back), btn("🧾 Просмотреть чек", Archive(occ=occ.id, src=src, page=0))],
+            [
+                btn("⬅️ Назад", back),
+                btn("🧾 Просмотреть чек", Archive(occ=occ.id, src=src, page=0)),
+            ],
         ]
     )
 
@@ -273,12 +311,12 @@ async def archive_screen(db: AsyncSession, occ: Occurrence, src: str, page: int)
         rows.append([btn(label, ArchiveMonth(occ=o.id, back=occ.id))])
     nav = []
     if page > 0:
-        nav.append(btn("< Назад", Archive(occ=occ.id, src=src, page=page - 1)))
+        nav.append(btn("⬅️ Назад", Archive(occ=occ.id, src=src, page=page - 1)))
     if (page + 1) * ARCHIVE_PAGE < len(items):
-        nav.append(btn("Далее >", Archive(occ=occ.id, src=src, page=page + 1)))
+        nav.append(btn("Далее ➡️", Archive(occ=occ.id, src=src, page=page + 1)))
     if nav:
         rows.append(nav)
-    rows.append([btn("Назад к карточке", Card(occ=occ.id, src=src))])
+    rows.append([btn("⬅️ Назад к карточке", Card(occ=occ.id, src=src))])
     text = (
         f"<b>Архив чеков и квитанций: {escape(occ.invoice.name)}</b>\n\nВыберите расчетный месяц:"
         if items
@@ -290,7 +328,9 @@ async def archive_screen(db: AsyncSession, occ: Occurrence, src: str, page: int)
 # --- handlers -----------------------------------------------------------------------
 
 
-async def show(target: Message | CallbackQuery, text: str, kb: InlineKeyboardMarkup) -> None:
+async def show(
+    target: Message | CallbackQuery, text: str, kb: InlineKeyboardMarkup
+) -> None:
     if isinstance(target, CallbackQuery):
         try:
             await target.message.edit_text(text, reply_markup=kb)
@@ -313,7 +353,9 @@ async def on_start(message: Message, state: FSMContext):
 async def on_menu(query: CallbackQuery, callback_data: Menu, state: FSMContext):
     await state.clear()
     async with SessionLocal() as db:
-        screen = {"main": main_screen, "due": due_screen, "list": list_screen}[callback_data.screen]
+        screen = {"main": main_screen, "due": due_screen, "list": list_screen}[
+            callback_data.screen
+        ]
         await show(query, *await screen(db))
 
 
@@ -342,10 +384,26 @@ async def on_pay(query: CallbackQuery, callback_data: Pay, user: User):
             except services.DomainError as e:
                 await query.answer(f"{e} — это делается в панели", show_alert=True)
                 return
-            audit.log(db, "occurrence.pay", f"Оплачен {name} через Telegram", actor=user, actor_name=label, entity_type="occurrence", entity_id=occ.id)
+            audit.log(
+                db,
+                "occurrence.pay",
+                f"Оплачен {name} через Telegram",
+                actor=user,
+                actor_name=label,
+                entity_type="occurrence",
+                entity_id=occ.id,
+            )
         elif not callback_data.paid and occ.is_paid:
             await services.mark_unpaid(db, occ, user, label)
-            audit.log(db, "occurrence.unpay", f"Отменена оплата {name} через Telegram", actor=user, actor_name=label, entity_type="occurrence", entity_id=occ.id)
+            audit.log(
+                db,
+                "occurrence.unpay",
+                f"Отменена оплата {name} через Telegram",
+                actor=user,
+                actor_name=label,
+                entity_type="occurrence",
+                entity_id=occ.id,
+            )
         await db.commit()
         await show(query, card_text(occ), card_keyboard(occ, callback_data.src))
 
@@ -364,10 +422,24 @@ async def on_remind_pay(query: CallbackQuery, callback_data: RemindPay, user: Us
             except services.DomainError as e:
                 await query.answer(f"{e} — это делается в панели", show_alert=True)
                 return
-            audit.log(db, "occurrence.pay", f"Оплачен «{occ.invoice.name}» за {d(occ.due_date)} через Telegram", actor=user, actor_name=label, entity_type="occurrence", entity_id=occ.id)
+            audit.log(
+                db,
+                "occurrence.pay",
+                f"Оплачен «{occ.invoice.name}» за {d(occ.due_date)} через Telegram",
+                actor=user,
+                actor_name=label,
+                entity_type="occurrence",
+                entity_id=occ.id,
+            )
             await db.commit()
-        text = reminder_text(occ) + f"\n\n✅ Оплачено {d(occ.paid_at)} — {escape(label)}"
-        kb = InlineKeyboardMarkup(inline_keyboard=[[btn("Открыть карточку инвойса", Card(occ=occ.id, src="notif"))]])
+        text = (
+            reminder_text(occ) + f"\n\n✅ Оплачено {d(occ.paid_at)} — {escape(label)}"
+        )
+        kb = InlineKeyboardMarkup(
+            inline_keyboard=[
+                [btn("Открыть карточку инвойса", Card(occ=occ.id, src="notif"))]
+            ]
+        )
         await query.message.edit_text(text, reply_markup=kb)
         await query.answer("Оплата отмечена")
 
@@ -379,7 +451,9 @@ async def on_archive(query: CallbackQuery, callback_data: Archive):
         if occ is None:
             await query.answer("Платёж не найден", show_alert=True)
             return
-        await show(query, *await archive_screen(db, occ, callback_data.src, callback_data.page))
+        await show(
+            query, *await archive_screen(db, occ, callback_data.src, callback_data.page)
+        )
 
 
 @router.callback_query(ArchiveMonth.filter())
@@ -398,7 +472,10 @@ async def on_archive_month(query: CallbackQuery, callback_data: ArchiveMonth):
         if occ.receipt_comment:
             caption += f"\n💬 {escape(occ.receipt_comment)}"
         await query.message.answer_document(
-            BufferedInputFile(path.read_bytes(), filename=occ.receipt_name or path.name), caption=caption
+            BufferedInputFile(
+                path.read_bytes(), filename=occ.receipt_name or path.name
+            ),
+            caption=caption,
         )
         await query.answer()
 
@@ -415,7 +492,9 @@ async def on_attach(query: CallbackQuery, callback_data: Attach, state: FSMConte
         await query.message.answer(
             f"Ответьте на это сообщение файлом или фото чека для «{escape(occ.invoice.name)}» "
             f"за {d(occ.due_date)}. /menu — отмена.",
-            reply_markup=ForceReply(selective=True, input_field_placeholder="Прикрепите чек"),
+            reply_markup=ForceReply(
+                selective=True, input_field_placeholder="Прикрепите чек"
+            ),
         )
         await query.answer()
 
@@ -425,11 +504,20 @@ async def on_receipt(message: Message, state: FSMContext, user: User):
     data = await state.get_data()
     await state.clear()
     if message.document:
-        file_id, filename, mime = message.document.file_id, message.document.file_name or "receipt", message.document.mime_type
+        file_id, filename, mime = (
+            message.document.file_id,
+            message.document.file_name or "receipt",
+            message.document.mime_type,
+        )
         size = message.document.file_size or 0
     else:
         photo = message.photo[-1]
-        file_id, filename, mime, size = photo.file_id, f"receipt-{photo.file_unique_id}.jpg", "image/jpeg", photo.file_size or 0
+        file_id, filename, mime, size = (
+            photo.file_id,
+            f"receipt-{photo.file_unique_id}.jpg",
+            "image/jpeg",
+            photo.file_size or 0,
+        )
     if size > receipts.MAX_SIZE:
         await message.answer("Файл больше 20 МБ")
         return
@@ -442,9 +530,19 @@ async def on_receipt(message: Message, state: FSMContext, user: User):
             return
         await receipts.store(occ, filename, buf.getvalue(), mime)
         label = actor_label(message.from_user)
-        audit.log(db, "occurrence.receipt", f"Чек «{occ.receipt_name}» к «{occ.invoice.name}» за {d(occ.due_date)} через Telegram", actor=user, actor_name=label, entity_type="occurrence", entity_id=occ.id)
+        audit.log(
+            db,
+            "occurrence.receipt",
+            f"Чек «{occ.receipt_name}» к «{occ.invoice.name}» за {d(occ.due_date)} через Telegram",
+            actor=user,
+            actor_name=label,
+            entity_type="occurrence",
+            entity_id=occ.id,
+        )
         await db.commit()
-        await message.answer(card_text(occ), reply_markup=card_keyboard(occ, data.get("src", "list")))
+        await message.answer(
+            card_text(occ), reply_markup=card_keyboard(occ, data.get("src", "list"))
+        )
 
 
 @router.message(ReceiptUpload.waiting)
@@ -492,9 +590,16 @@ async def send_assigned(occ: Occurrence, user: User) -> None:
         return
     text = f"Вас назначили ответственным за платёж.\n\n{reminder_text(occ)}"
     try:
-        await bot.send_message(user.telegram_id, text, reply_markup=reminder_keyboard(occ))
+        await bot.send_message(
+            user.telegram_id, text, reply_markup=reminder_keyboard(occ)
+        )
     except Exception as e:
-        log.warning("Failed to send Telegram assignment for occurrence %s to %s: %s", occ.id, user.email, e)
+        log.warning(
+            "Failed to send Telegram assignment for occurrence %s to %s: %s",
+            occ.id,
+            user.email,
+            e,
+        )
 
 
 async def send_reminder(occ: Occurrence) -> bool:
@@ -517,7 +622,12 @@ async def send_reminder(occ: Occurrence) -> bool:
         try:
             await bot.send_message(user.telegram_id, text, reply_markup=kb)
         except Exception as e:
-            log.warning("Failed to send Telegram reminder for occurrence %s to %s: %s", occ.id, user.email, e)
+            log.warning(
+                "Failed to send Telegram reminder for occurrence %s to %s: %s",
+                occ.id,
+                user.email,
+                e,
+            )
     return True
 
 
@@ -531,7 +641,9 @@ def create() -> Dispatcher | None:
         return None
     bot = Bot(
         settings.telegram_bot_token,
-        default=DefaultBotProperties(parse_mode=ParseMode.HTML, link_preview_is_disabled=True),
+        default=DefaultBotProperties(
+            parse_mode=ParseMode.HTML, link_preview_is_disabled=True
+        ),
     )
     dp = Dispatcher()
     router.message.outer_middleware(Access())
@@ -560,7 +672,9 @@ async def run(dp: Dispatcher) -> None:
     assert bot is not None
     await bot.set_my_commands([BotCommand(command="menu", description="Главное меню")])
     await setup_menu_button()
-    await dp.start_polling(bot, handle_signals=False, allowed_updates=["message", "callback_query"])
+    await dp.start_polling(
+        bot, handle_signals=False, allowed_updates=["message", "callback_query"]
+    )
 
 
 async def close() -> None:
