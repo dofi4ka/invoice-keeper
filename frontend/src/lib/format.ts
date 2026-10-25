@@ -7,18 +7,35 @@ export function money(amount: string | number | null | undefined, currency: Curr
   if (amount === null || amount === undefined || amount === "") return "по факту";
   let f = moneyFormat.get(currency);
   if (!f) {
-    f = new Intl.NumberFormat("ru-RU", { style: "currency", currency, minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    f = new Intl.NumberFormat("ru-RU", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
     moneyFormat.set(currency, f);
   }
   return f.format(Number(amount));
 }
 
-export const CURRENCY_LABEL: Record<Currency, string> = { RUB: "Рубли", USD: "Доллары", EUR: "Евро" };
-export const CURRENCY_SIGN: Record<Currency, string> = { RUB: "₽", USD: "$", EUR: "€" };
+export const CURRENCY_LABEL: Record<Currency, string> = {
+  RUB: "Рубли",
+  USD: "Доллары",
+  EUR: "Евро",
+};
+export const CURRENCY_SIGN: Record<Currency, string> = {
+  RUB: "₽",
+  USD: "$",
+  EUR: "€",
+};
 
 export type Totals = Partial<Record<Currency, number>>;
 
-export function addTo(totals: Totals, currency: Currency, amount: string | number | null | undefined) {
+export function addTo(
+  totals: Totals,
+  currency: Currency,
+  amount: string | number | null | undefined,
+) {
   if (amount === null || amount === undefined) return;
   totals[currency] = (totals[currency] ?? 0) + Number(amount);
 }
@@ -74,15 +91,61 @@ export function dmy(value: string | Date | null | undefined): string {
 }
 
 export const MONTHS = [
-  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
-  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
+  "Январь",
+  "Февраль",
+  "Март",
+  "Апрель",
+  "Май",
+  "Июнь",
+  "Июль",
+  "Август",
+  "Сентябрь",
+  "Октябрь",
+  "Ноябрь",
+  "Декабрь",
 ];
 export const MONTHS_GEN = [
-  "января", "февраля", "марта", "апреля", "мая", "июня",
-  "июля", "августа", "сентября", "октября", "ноября", "декабря",
+  "января",
+  "февраля",
+  "марта",
+  "апреля",
+  "мая",
+  "июня",
+  "июля",
+  "августа",
+  "сентября",
+  "октября",
+  "ноября",
+  "декабря",
 ];
-export const MONTHS_SHORT = ["янв.", "фев.", "мар.", "апр.", "мая", "июн.", "июл.", "авг.", "сен.", "окт.", "нояб.", "дек."];
-export const MONTHS_TICK = ["янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"];
+export const MONTHS_SHORT = [
+  "янв.",
+  "фев.",
+  "мар.",
+  "апр.",
+  "мая",
+  "июн.",
+  "июл.",
+  "авг.",
+  "сен.",
+  "окт.",
+  "нояб.",
+  "дек.",
+];
+export const MONTHS_TICK = [
+  "янв",
+  "фев",
+  "мар",
+  "апр",
+  "май",
+  "июн",
+  "июл",
+  "авг",
+  "сен",
+  "окт",
+  "ноя",
+  "дек",
+];
 export const WEEKDAYS = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
 
 /** "26 окт." */
@@ -145,7 +208,11 @@ export const RECURRENCE_HINT: Record<Recurrence, string> = {
   once: "Разовый платёж без повторений",
 };
 
-const MONTH_STEP: Partial<Record<Recurrence, number>> = { monthly: 1, quarterly: 3, yearly: 12 };
+const MONTH_STEP: Partial<Record<Recurrence, number>> = {
+  monthly: 1,
+  quarterly: 3,
+  yearly: 12,
+};
 
 export function dueDate(anchor: Date, recurrence: Recurrence, seq: number): Date {
   if (recurrence === "days30") return addDays(anchor, 30 * seq);
@@ -185,7 +252,7 @@ export const STATUS_LABEL: Record<Status, string> = {
 
 /** Right-hand hint of an invoice card. */
 export function dueHint(isPaid: boolean, due: string, paidAt: string | null): string {
-  if (isPaid) return paidAt ? `✓ Оплачен ${shortDate(paidAt)}` : "✓ Оплачен";
+  if (isPaid) return paidAt ? `Оплачен ${shortDate(paidAt)}` : "Оплачен";
   const delta = diffDays(parseDate(due), today());
   if (delta < 0) return `Просрочен на ${-delta} д.`;
   if (delta === 0) return "Сегодня";

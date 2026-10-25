@@ -1,14 +1,28 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { api, invalidate, useQuery } from "../api";
 import { useMe } from "../auth";
-import { CURRENCY_SIGN, RECURRENCE_LABEL, dmy, iso, money, periodTitle, plural, today } from "../lib/format";
+import {
+  CURRENCY_SIGN,
+  RECURRENCE_LABEL,
+  dmy,
+  iso,
+  money,
+  periodTitle,
+  plural,
+  today,
+} from "../lib/format";
 import type { CategoryWithSpend, Invoice, Occurrence, User } from "../types";
 import DateInput from "./DateInput";
 import Popover from "./Popover";
 import { Select } from "./Select";
 import { CategoryIcon, Emoji, Kv, toast } from "./ui";
 
-const STATUS_TEXT = { paid: "Оплачено", overdue: "Просрочено", soon: "Не оплачено", upcoming: "Не оплачено" } as const;
+const STATUS_TEXT = {
+  paid: "Оплачено",
+  overdue: "Просрочено",
+  soon: "Не оплачено",
+  upcoming: "Не оплачено",
+} as const;
 
 function reminderText(occ: Occurrence): string {
   if (occ.reminder_sent_at) return "Отправлено";
@@ -27,9 +41,13 @@ function AmountInput({ invoice }: { invoice: Invoice }) {
   useEffect(() => setValue(invoice.amount ? String(Number(invoice.amount)) : ""), [invoice.amount]);
   const save = async () => {
     const amount = value.replace(/\s/g, "").replace(",", ".");
-    if (!amount || Number(amount) === Number(invoice.amount)) return setValue(invoice.amount ? String(Number(invoice.amount)) : "");
+    if (!amount || Number(amount) === Number(invoice.amount))
+      return setValue(invoice.amount ? String(Number(invoice.amount)) : "");
     try {
-      await api(`/recurring-payments/${invoice.id}`, { method: "PATCH", json: { amount } });
+      await api(`/recurring-payments/${invoice.id}`, {
+        method: "PATCH",
+        json: { amount },
+      });
       toast("Цена обновлена для неоплаченных периодов");
       invalidate();
     } catch (e) {
@@ -37,7 +55,10 @@ function AmountInput({ invoice }: { invoice: Invoice }) {
     }
   };
   return (
-    <div className="row" data-tip="Новая цена применяется к неоплаченным периодам; оплаченные остаются в истории со старой ценой">
+    <div
+      className="row"
+      data-tip="Новая цена применяется к неоплаченным периодам; оплаченные остаются в истории со старой ценой"
+    >
       <input
         className="input compact inv-price"
         style={{ height: 44, fontSize: 24 }}
@@ -59,7 +80,10 @@ function Responsibles({ invoice, isAdmin }: { invoice: Invoice; isAdmin: boolean
   const ids = invoice.responsibles.map((u) => u.id);
   const save = async (next: number[]) => {
     try {
-      await api(`/recurring-payments/${invoice.id}`, { method: "PATCH", json: { responsible_ids: next } });
+      await api(`/recurring-payments/${invoice.id}`, {
+        method: "PATCH",
+        json: { responsible_ids: next },
+      });
       invalidate();
     } catch (e) {
       toast((e as Error).message);
@@ -72,7 +96,13 @@ function Responsibles({ invoice, isAdmin }: { invoice: Invoice; isAdmin: boolean
         <p data-tip="Ответственным дополнительно приходят уведомления на почту">Ответственные</p>
         {isAdmin && !invoice.archived ? (
           <div style={{ display: "flex", justifyContent: "flex-end" }}>
-            <button ref={ref} type="button" className="btn btn-sm" onClick={() => setOpen(!open)} disabled={!candidates.length && !!users}>
+            <button
+              ref={ref}
+              type="button"
+              className="btn btn-sm"
+              onClick={() => setOpen(!open)}
+              disabled={!candidates.length && !!users}
+            >
               Добавить
             </button>
             <Popover anchor={ref} open={open} onClose={() => setOpen(false)} align="end">
@@ -105,7 +135,12 @@ function Responsibles({ invoice, isAdmin }: { invoice: Invoice; isAdmin: boolean
                 <p>{u.email}</p>
               </div>
               {isAdmin && !invoice.archived && (
-                <button type="button" className="icon-btn" aria-label="Убрать" onClick={() => save(ids.filter((x) => x !== u.id))}>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label="Убрать"
+                  onClick={() => save(ids.filter((x) => x !== u.id))}
+                >
                   ✕
                 </button>
               )}
@@ -133,7 +168,10 @@ function Period({ occ, archived }: { occ: Occurrence; archived: boolean }) {
   const patch = async (body: Record<string, unknown>, message?: string) => {
     setBusy(true);
     try {
-      await api(`/payment-occurrences/${occ.id}`, { method: "PATCH", json: body });
+      await api(`/payment-occurrences/${occ.id}`, {
+        method: "PATCH",
+        json: body,
+      });
       if (message) toast(message);
       invalidate();
     } catch (e) {
@@ -149,7 +187,10 @@ function Period({ occ, archived }: { occ: Occurrence; archived: boolean }) {
     form.append("file", file);
     setBusy(true);
     try {
-      await api(`/payment-occurrences/${occ.id}/receipt`, { method: "POST", body: form });
+      await api(`/payment-occurrences/${occ.id}/receipt`, {
+        method: "POST",
+        body: form,
+      });
       toast("Чек загружен");
       invalidate();
     } catch (e) {
@@ -203,7 +244,11 @@ function Period({ occ, archived }: { occ: Occurrence; archived: boolean }) {
           clearable={occ.is_paid}
           onChange={(v) => {
             setDraftDate(v);
-            if (occ.is_paid) patch(v ? { paid_at: v } : { is_paid: false }, v ? "Дата оплаты исправлена" : "Оплата отменена");
+            if (occ.is_paid)
+              patch(
+                v ? { paid_at: v } : { is_paid: false },
+                v ? "Дата оплаты исправлена" : "Оплата отменена",
+              );
           }}
         />
       </Kv>
@@ -211,7 +256,12 @@ function Period({ occ, archived }: { occ: Occurrence; archived: boolean }) {
         <div className="file-pick">
           {occ.receipt_name ? (
             <>
-              <a href={`/api/v1/payment-occurrences/${occ.id}/receipt`} target="_blank" rel="noreferrer" title={occ.receipt_name}>
+              <a
+                href={`/api/v1/payment-occurrences/${occ.id}/receipt`}
+                target="_blank"
+                rel="noreferrer"
+                title={occ.receipt_name}
+              >
                 {occ.receipt_name}
               </a>
               <button
@@ -219,13 +269,22 @@ function Period({ occ, archived }: { occ: Occurrence; archived: boolean }) {
                 className="icon-btn"
                 aria-label="Удалить чек"
                 disabled={busy}
-                onClick={() => api(`/payment-occurrences/${occ.id}/receipt`, { method: "DELETE" }).then(invalidate)}
+                onClick={() =>
+                  api(`/payment-occurrences/${occ.id}/receipt`, {
+                    method: "DELETE",
+                  }).then(invalidate)
+                }
               >
                 ✕
               </button>
             </>
           ) : (
-            <button type="button" className="btn btn-sm" disabled={busy} onClick={() => fileRef.current?.click()}>
+            <button
+              type="button"
+              className="btn btn-sm"
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+            >
               Выбрать файл
             </button>
           )}
@@ -247,14 +306,21 @@ function Period({ occ, archived }: { occ: Occurrence; archived: boolean }) {
           className="input compact"
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          onBlur={() => comment !== (occ.receipt_comment ?? "") && patch({ receipt_comment: comment })}
+          onBlur={() =>
+            comment !== (occ.receipt_comment ?? "") && patch({ receipt_comment: comment })
+          }
           onKeyDown={(e) => e.key === "Enter" && (e.target as HTMLInputElement).blur()}
         />
       </Kv>
       {!archived &&
         (occ.is_paid ? (
-          <button type="button" className="btn btn-success btn-block" disabled={busy} onClick={() => patch({ is_paid: false }, "Оплата отменена")}>
-            ✓ Оплачено · Отменить оплату
+          <button
+            type="button"
+            className="btn btn-success btn-block"
+            disabled={busy}
+            onClick={() => patch({ is_paid: false }, "Оплата отменена")}
+          >
+            Отменить оплату
           </button>
         ) : (
           <span data-tip={confirmTip} style={{ display: "block" }}>
@@ -286,7 +352,9 @@ export default function InvoicePanel({ invoiceId, occurrenceId, onArchived }: Pr
   const me = useMe();
   const isAdmin = me.is_admin;
   const { data: invoice, error } = useQuery<Invoice>(`/recurring-payments/${invoiceId}`);
-  const { data: occurrences } = useQuery<Occurrence[]>(`/recurring-payments/${invoiceId}/occurrences`);
+  const { data: occurrences } = useQuery<Occurrence[]>(
+    `/recurring-payments/${invoiceId}/occurrences`,
+  );
   const { data: categories } = useQuery<CategoryWithSpend[]>(isAdmin ? "/categories" : null);
   // the shown period is pinned by id, so paying it does not jump to the next unpaid one
   const [pinnedId, setPinnedId] = useState<number | null>(null);
@@ -305,7 +373,12 @@ export default function InvoicePanel({ invoiceId, occurrenceId, onArchived }: Pr
   }, [pinnedId, occurrences, initial]);
 
   if (error) return <div className="side-empty">{error}</div>;
-  if (!invoice) return <div className="side-empty"><div className="spinner" /></div>;
+  if (!invoice)
+    return (
+      <div className="side-empty">
+        <div className="spinner" />
+      </div>
+    );
 
   const pinned = occurrences?.findIndex((o) => o.id === pinnedId) ?? -1;
   const i = pinned >= 0 ? pinned : initial;
@@ -315,7 +388,10 @@ export default function InvoicePanel({ invoiceId, occurrenceId, onArchived }: Pr
 
   const patchInvoice = async (body: Record<string, unknown>) => {
     try {
-      await api(`/recurring-payments/${invoice.id}`, { method: "PATCH", json: body });
+      await api(`/recurring-payments/${invoice.id}`, {
+        method: "PATCH",
+        json: body,
+      });
       invalidate();
     } catch (e) {
       toast((e as Error).message);
@@ -341,12 +417,20 @@ export default function InvoicePanel({ invoiceId, occurrenceId, onArchived }: Pr
             clearable
             placeholder="Без категории"
             value={invoice.category?.id ?? null}
-            options={(categories ?? []).map((c) => ({ value: c.id, label: <span className="row"><CategoryIcon icon={c.icon} size={16} />{c.name}</span> }))}
+            options={(categories ?? []).map((c) => ({
+              value: c.id,
+              label: (
+                <span className="row">
+                  <CategoryIcon icon={c.icon} size={16} />
+                  {c.name}
+                </span>
+              ),
+            }))}
             onChange={(v) => patchInvoice({ category_id: v })}
             onClear={() => patchInvoice({ category_id: null })}
           />
         ) : (
-          invoice.category?.name ?? "Без категории"
+          (invoice.category?.name ?? "Без категории")
         )}
       </Kv>
       <Kv label="Регулярность" tip="После создания регулярность не меняется">
@@ -357,7 +441,17 @@ export default function InvoicePanel({ invoiceId, occurrenceId, onArchived }: Pr
           {editable ? (
             <LinkInput invoice={invoice} onSave={(link) => patchInvoice({ link })} />
           ) : (
-            <a href={invoice.link!} target="_blank" rel="noreferrer" className="link-btn" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <a
+              href={invoice.link!}
+              target="_blank"
+              rel="noreferrer"
+              className="link-btn"
+              style={{
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+            >
               {invoice.link!.replace(/^https?:\/\//, "")}
             </a>
           )}
@@ -368,7 +462,13 @@ export default function InvoicePanel({ invoiceId, occurrenceId, onArchived }: Pr
       {occ && (
         <div className="period-box">
           <div className="period-head">
-            <button type="button" className="icon-btn" disabled={i <= 0} onClick={() => go(i - 1)} aria-label="Предыдущий период">
+            <button
+              type="button"
+              className="icon-btn"
+              disabled={i <= 0}
+              onClick={() => go(i - 1)}
+              aria-label="Предыдущий период"
+            >
               <Emoji e="⬅️" />
             </button>
             <p>{periodTitle(invoice.recurrence, occ.due_date)}</p>
@@ -391,8 +491,15 @@ export default function InvoicePanel({ invoiceId, occurrenceId, onArchived }: Pr
           type="button"
           className="btn btn-danger"
           onClick={async () => {
-            if (!window.confirm(`Архивировать «${invoice.name}»? Напоминания прекратятся, история оплат сохранится.`)) return;
-            await api(`/recurring-payments/${invoice.id}`, { method: "DELETE" });
+            if (
+              !window.confirm(
+                `Архивировать «${invoice.name}»? Напоминания прекратятся, история оплат сохранится.`,
+              )
+            )
+              return;
+            await api(`/recurring-payments/${invoice.id}`, {
+              method: "DELETE",
+            });
             toast("Платёж архивирован");
             invalidate();
             onArchived?.();
@@ -406,9 +513,16 @@ export default function InvoicePanel({ invoiceId, occurrenceId, onArchived }: Pr
           type="button"
           className="btn btn-primary"
           onClick={async () => {
-            if (!window.confirm(`Разархивировать «${invoice.name}»? Периоды, пришедшиеся на время архива, не восстановятся.`)) return;
+            if (
+              !window.confirm(
+                `Разархивировать «${invoice.name}»? Периоды, пришедшиеся на время архива, не восстановятся.`,
+              )
+            )
+              return;
             try {
-              await api(`/recurring-payments/${invoice.id}/unarchive`, { method: "POST" });
+              await api(`/recurring-payments/${invoice.id}/unarchive`, {
+                method: "POST",
+              });
               toast("Платёж снова активен");
               setPinnedId(null);
               invalidate();
@@ -424,7 +538,13 @@ export default function InvoicePanel({ invoiceId, occurrenceId, onArchived }: Pr
   );
 }
 
-function LinkInput({ invoice, onSave }: { invoice: Invoice; onSave: (link: string | null) => void }) {
+function LinkInput({
+  invoice,
+  onSave,
+}: {
+  invoice: Invoice;
+  onSave: (link: string | null) => void;
+}) {
   const [value, setValue] = useState(invoice.link ?? "");
   useEffect(() => setValue(invoice.link ?? ""), [invoice.link]);
   return (

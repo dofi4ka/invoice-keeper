@@ -26,11 +26,25 @@ function useRange(mode: "year" | "quarter", year: number, quarter: number) {
   };
 }
 
-function Charts({ occurrences, rates, firstMonth, months }: { occurrences: Occurrence[]; rates: Rates | undefined; firstMonth: number; months: number }) {
+function Charts({
+  occurrences,
+  rates,
+  firstMonth,
+  months,
+}: {
+  occurrences: Occurrence[];
+  rates: Rates | undefined;
+  firstMonth: number;
+  months: number;
+}) {
   const rate = useCallback((c: Currency) => rates?.rub_per_unit[c] ?? 1, [rates]);
 
   const monthly = useMemo(() => {
-    const raw: Raw = { RUB: Array(months).fill(0), USD: Array(months).fill(0), EUR: Array(months).fill(0) };
+    const raw: Raw = {
+      RUB: Array(months).fill(0),
+      USD: Array(months).fill(0),
+      EUR: Array(months).fill(0),
+    };
     for (const o of occurrences) {
       if (o.amount === null) continue;
       const m = parseDate(o.due_date).getMonth() - firstMonth;
@@ -48,17 +62,22 @@ function Charts({ occurrences, rates, firstMonth, months }: { occurrences: Occur
       row[o.invoice.currency] += Number(o.amount);
       map.set(name, row);
     }
-    const total = (r: Record<Currency, number>) => CURRENCIES.reduce((s, c) => s + r[c] * rate(c), 0);
+    const total = (r: Record<Currency, number>) =>
+      CURRENCIES.reduce((s, c) => s + r[c] * rate(c), 0);
     return [...map.entries()].sort((a, b) => total(b[1]) - total(a[1]));
   }, [occurrences, rate]);
 
-  const originalLabel = (raw: (c: Currency, i: number) => number) => (item: { datasetIndex: number; dataIndex: number }) => {
-    const c = CURRENCIES[item.datasetIndex];
-    return ` ${c}: ${money(raw(c, item.dataIndex), c)}`;
-  };
+  const originalLabel =
+    (raw: (c: Currency, i: number) => number) =>
+    (item: { datasetIndex: number; dataIndex: number }) => {
+      const c = CURRENCIES[item.datasetIndex];
+      return ` ${c}: ${money(raw(c, item.dataIndex), c)}`;
+    };
 
   const lineData = {
-    labels: Array.from({ length: months }, (_, i) => (months === 12 ? MONTHS_TICK[firstMonth + i] : MONTHS[firstMonth + i])),
+    labels: Array.from({ length: months }, (_, i) =>
+      months === 12 ? MONTHS_TICK[firstMonth + i] : MONTHS[firstMonth + i],
+    ),
     datasets: CURRENCIES.map((c) => ({
       label: c,
       data: monthly[c].map((v) => v * rate(c)),
@@ -78,7 +97,10 @@ function Charts({ occurrences, rates, firstMonth, months }: { occurrences: Occur
     interaction: { mode: "index", intersect: false },
     plugins: {
       legend: legendBottom,
-      tooltip: { ...tooltipStyle, callbacks: { label: originalLabel((c, i) => monthly[c][i]) } },
+      tooltip: {
+        ...tooltipStyle,
+        callbacks: { label: originalLabel((c, i) => monthly[c][i]) },
+      },
     },
     scales: {
       x: { grid: { display: false } },
@@ -133,15 +155,23 @@ function Charts({ occurrences, rates, firstMonth, months }: { occurrences: Occur
   return (
     <div className="charts">
       <div className="card col" style={{ gap: 12 }}>
-        <h2 data-tip="Суммы платежей по сроку оплаты; валюты приведены к рублю по курсу ЦБ РФ только для масштаба">Расходы по месяцам</h2>
+        <h2 data-tip="Суммы платежей по сроку оплаты; валюты приведены к рублю по курсу ЦБ РФ только для масштаба">
+          Расходы по месяцам
+        </h2>
         <div className="chart-box">
           <Line data={lineData} options={lineOptions} />
         </div>
       </div>
       <div className="card col" style={{ gap: 12 }}>
-        <h2 data-tip="Логарифмическая шкала; в подсказке — исходная сумма и валюта">Расходы по категориям</h2>
+        <h2 data-tip="Логарифмическая шкала; в подсказке — исходная сумма и валюта">
+          Расходы по категориям
+        </h2>
         <div className="chart-box">
-          {byCategory.length ? <Bar data={barData} options={barOptions} /> : <div className="empty">Нет данных за период</div>}
+          {byCategory.length ? (
+            <Bar data={barData} options={barOptions} />
+          ) : (
+            <div className="empty">Нет данных за период</div>
+          )}
         </div>
       </div>
     </div>
@@ -158,7 +188,9 @@ export default function Dashboard() {
   const [scope, setScope] = useState<"all" | "mine">(me.is_admin ? "all" : "mine");
   const range = useRange(mode, year, quarter);
 
-  const { data: occurrences } = useQuery<Occurrence[]>(`/payment-occurrences${qs({ date_from: range.from, date_to: range.to })}`);
+  const { data: occurrences } = useQuery<Occurrence[]>(
+    `/payment-occurrences${qs({ date_from: range.from, date_to: range.to })}`,
+  );
   const { data: rates } = useQuery<Rates>("/rates");
   const { data: upcoming } = useQuery<Occurrence[]>(
     `/payment-occurrences${qs({ status: ["overdue", "soon", "upcoming"], date_to: iso(addDays(now, 30)), mine: scope === "mine" })}`,
@@ -183,7 +215,11 @@ export default function Dashboard() {
       <h1>Главная</h1>
       <div className="col" style={{ gap: 12 }}>
         <div className="row" style={{ gap: 12, flexWrap: "wrap" }}>
-          <Stepper value={mode === "year" ? year : `Q${quarter} ${year}`} onPrev={() => step(-1)} onNext={() => step(1)} />
+          <Stepper
+            value={mode === "year" ? year : `Q${quarter} ${year}`}
+            onPrev={() => step(-1)}
+            onNext={() => step(1)}
+          />
           <Seg
             value={mode}
             onChange={setMode}
@@ -193,10 +229,19 @@ export default function Dashboard() {
             ]}
           />
         </div>
-        <Charts occurrences={occurrences ?? []} rates={rates} firstMonth={range.firstMonth} months={range.months} />
+        <Charts
+          occurrences={occurrences ?? []}
+          rates={rates}
+          firstMonth={range.firstMonth}
+          months={range.months}
+        />
       </div>
       <div className="col upcoming" style={{ gap: 12 }}>
-        <div className="row" data-tip="Просроченные и неоплаченные платежи со сроком в ближайшие 30 дней" style={{ width: "fit-content" }}>
+        <div
+          className="row"
+          data-tip="Просроченные и неоплаченные платежи со сроком в ближайшие 30 дней"
+          style={{ width: "fit-content" }}
+        >
           <Seg
             value={scope}
             onChange={setScope}
@@ -208,12 +253,21 @@ export default function Dashboard() {
         </div>
         <div className="cards two">
           {list.map((o) => (
-            <InvoiceCard key={o.id} invoice={o.invoice} occurrence={o} onClick={() => navigate(`/invoices?invoice=${o.invoice_id}&occurrence=${o.id}`)} />
+            <InvoiceCard
+              key={o.id}
+              invoice={o.invoice}
+              occurrence={o}
+              onClick={() => navigate(`/invoices?invoice=${o.invoice_id}&occurrence=${o.id}`)}
+            />
           ))}
         </div>
-        {upcoming && list.length === 0 && <div className="card empty">Ближайших платежей нет <Emoji e="🎉" /></div>}
+        {upcoming && list.length === 0 && (
+          <div className="card empty">
+            Ближайших платежей нет <Emoji e="🎉" />
+          </div>
+        )}
         <Link to="/calendar" className="link-btn">
-          Открыть календарь{upcoming && upcoming.length > list.length ? ` · ещё ${upcoming.length - list.length}` : ""} →
+          Открыть календарь →
         </Link>
       </div>
     </div>

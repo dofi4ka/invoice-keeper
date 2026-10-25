@@ -77,7 +77,7 @@ function MoneyLine({ currency, budget, cell, year, month, editable, big }: { cur
   const left = budget === null ? null : budget - used;
   const over = left !== null && left < 0;
   return (
-    <div className="money-line">
+    <div className={`money-line ${over ? "over" : ""}`}>
       <div className="money-head">
         <span className={big ? "money-big" : ""} style={{ fontWeight: 600 }}>
           <BudgetValue year={year} month={month} currency={currency} amount={budget} editable={editable} />
@@ -97,9 +97,9 @@ function MoneyLine({ currency, budget, cell, year, month, editable, big }: { cur
         <span className="planned" style={{ width: `${(cell.planned / base) * 100}%` }} />
       </div>
       <small>
-        <span className="legend-dot" style={{ background: "#000" }} />
+        <span className="legend-dot paid" />
         {money(cell.paid, currency)}
-        <span className="legend-dot" style={{ background: "var(--accent)", marginLeft: 10 }} />
+        <span className="legend-dot planned" style={{ marginLeft: 10 }} />
         {money(cell.planned, currency)}
       </small>
     </div>
